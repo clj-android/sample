@@ -1,4 +1,0 @@
-#Tue Feb 17 04:31:45 UTC 2026
-base.0=/home/claude/clojure-android/sample/app/build/intermediates/dex/release/mergeDexRelease/classes.dex
-path.0=classes.dex
-renamed.0=classes.dex

@@ -1,7 +1,0 @@
-com.example.clojuredroid.app-pngs-0 /home/claude/clojure-android/sample/app/build/generated/res/pngs/debug
-com.example.clojuredroid.app-resValues-1 /home/claude/clojure-android/sample/app/build/generated/res/resValues/debug
-com.example.clojuredroid.app-packageDebugResources-2 /home/claude/clojure-android/sample/app/build/intermediates/incremental/debug/packageDebugResources/merged.dir
-com.example.clojuredroid.app-packageDebugResources-3 /home/claude/clojure-android/sample/app/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
-com.example.clojuredroid.app-debug-4 /home/claude/clojure-android/sample/app/build/intermediates/merged_res/debug/mergeDebugResources
-com.example.clojuredroid.app-debug-5 /home/claude/clojure-android/sample/app/src/debug/res
-com.example.clojuredroid.app-main-6 /home/claude/clojure-android/sample/app/src/main/res
