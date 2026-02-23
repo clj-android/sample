@@ -20,7 +20,7 @@ This app depends on several libraries from the [clj-android](https://github.com/
 |---|---|
 | [android-clojure-plugin](https://github.com/clj-android/android-clojure-plugin) | Gradle plugin — AOT-compiles Clojure sources and wires them into the Android build |
 | [neko](https://github.com/clj-android/neko) | Idiomatic Clojure wrappers for Android APIs (UI DSL, activities, logging) |
-| [runtime-core](https://github.com/clj-android/runtime-core) | Core Android runtime support (ClojureApp application class) |
+| [runtime-core](https://github.com/clj-android/runtime-core) | Core Android runtime support (ClojureApp, ClojureActivity base classes) |
 | [runtime-repl](https://github.com/clj-android/runtime-repl) | nREPL server with on-device DEX compilation for REPL-driven development |
 | [clojure-patched](https://github.com/clj-android/clojure-patched) | Clojure 1.12.0 with Android-aware classloader (used automatically in debug builds) |
 
@@ -86,7 +86,7 @@ Then connect from any nREPL client (Calva, CIDER, `lein repl :connect`, etc.) to
 Example — hot-reload the UI from the REPL:
 
 ```clojure
-(require '[com.example.clojuredroid.ui :as ui])
+(require '[com.example.clojuredroid.neko-activity :as ui])
 
 (reset! ui/*ui-tree
   [:linear-layout {:orientation :vertical :padding [32 32 32 32]}
