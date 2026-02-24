@@ -24,7 +24,9 @@ This app depends on several libraries from the [clj-android](https://github.com/
 | [runtime-repl](https://github.com/clj-android/runtime-repl) | nREPL server with on-device DEX compilation for REPL-driven development |
 | [clojure-patched](https://github.com/clj-android/clojure-patched) | Clojure 1.12.0 with Android-aware classloader (used automatically in debug builds) |
 
-**Recommended:** clone all the repositories as siblings so dependencies resolve automatically via Gradle composite builds:
+Dependencies are resolved automatically: if sibling checkouts exist, Gradle builds them from source via composite builds; if not, they are **cloned automatically** from GitHub on the first build. No manual setup is required.
+
+If cloning fails (e.g. no network), you can either clone the repositories manually:
 
 ```bash
 mkdir clojure-android && cd clojure-android
@@ -33,19 +35,7 @@ for repo in sample android-clojure-plugin neko runtime-core runtime-repl clojure
 done
 ```
 
-The resulting layout should be:
-
-```
-clojure-android/
-  sample/                  <-- build from here
-  android-clojure-plugin/
-  neko/
-  runtime-core/
-  runtime-repl/
-  clojure-patched/
-```
-
-**Alternatively**, if you only have the sample repository, build and install each dependency to your local Maven repository first:
+or build and install each dependency to your local Maven repository:
 
 ```bash
 # In each sibling project directory:
