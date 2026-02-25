@@ -7,10 +7,13 @@ pluginManagement {
     }
 
     // Build the Gradle plugin from source — clone it if the checkout is missing.
+    // Check for build.gradle.kts (not just directory existence) so that an empty
+    // or corrupt directory left by a failed clone is re-cloned automatically.
     val pluginDir = java.io.File(file(".."), "android-clojure-plugin")
-    if (!pluginDir.isDirectory) {
+    if (!java.io.File(pluginDir, "build.gradle.kts").isFile) {
         println("Cloning android-clojure-plugin from https://github.com/clj-android/android-clojure-plugin.git ...")
         try {
+            if (pluginDir.isDirectory) pluginDir.deleteRecursively()
             val proc = ProcessBuilder(
                 "git", "clone", "--depth", "1",
                 "https://github.com/clj-android/android-clojure-plugin.git",
@@ -22,7 +25,7 @@ pluginManagement {
             println("WARNING: could not clone android-clojure-plugin — falling back to published artifacts")
         }
     }
-    if (pluginDir.isDirectory) {
+    if (java.io.File(pluginDir, "build.gradle.kts").isFile) {
         includeBuild(pluginDir)
     }
 }
@@ -44,10 +47,13 @@ include(":app")
 // (in which case Gradle falls back to published artifacts from mavenLocal).
 fun ensureSibling(parent: java.io.File, name: String): java.io.File? {
     val dir = java.io.File(parent, name)
-    if (dir.isDirectory) return dir
+    // Check for build.gradle.kts (not just directory existence) so that an empty
+    // or corrupt directory left by a failed clone is re-cloned automatically.
+    if (java.io.File(dir, "build.gradle.kts").isFile) return dir
 
     println("Cloning $name from https://github.com/clj-android/$name.git ...")
     return try {
+        if (dir.isDirectory) dir.deleteRecursively()
         val proc = ProcessBuilder(
             "git", "clone", "--depth", "1",
             "https://github.com/clj-android/$name.git",
