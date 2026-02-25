@@ -5,29 +5,6 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
-
-    // Build the Gradle plugin from source — clone it if the checkout is missing.
-    // Check for build.gradle.kts (not just directory existence) so that an empty
-    // or corrupt directory left by a failed clone is re-cloned automatically.
-    val pluginDir = java.io.File(file(".."), "android-clojure-plugin")
-    if (!java.io.File(pluginDir, "build.gradle.kts").isFile) {
-        println("Cloning android-clojure-plugin from https://github.com/clj-android/android-clojure-plugin.git ...")
-        try {
-            if (pluginDir.isDirectory) pluginDir.deleteRecursively()
-            val proc = ProcessBuilder(
-                "git", "clone", "--depth", "1",
-                "https://github.com/clj-android/android-clojure-plugin.git",
-                pluginDir.absolutePath
-            ).redirectErrorStream(true).start()
-            proc.inputStream.bufferedReader().forEachLine { println("  $it") }
-            proc.waitFor()
-        } catch (_: Exception) {
-            println("WARNING: could not clone android-clojure-plugin — falling back to published artifacts")
-        }
-    }
-    if (java.io.File(pluginDir, "build.gradle.kts").isFile) {
-        includeBuild(pluginDir)
-    }
 }
 
 dependencyResolutionManagement {
@@ -42,15 +19,53 @@ dependencyResolutionManagement {
 rootProject.name = "clojure-android-sample"
 include(":app")
 
-// Clone a sibling repository from the clj-android GitHub organization if it is
-// not already checked out.  Returns the directory, or null if cloning failed
-// (in which case Gradle falls back to published artifacts from mavenLocal).
+// ---------------------------------------------------------------------------
+// Auto-clone helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true if [dir] is a shallow git clone (created by our --depth 1
+ * auto-clone).  Full user working copies are never shallow, so this
+ * distinguishes "managed by settings.gradle.kts" from "user checkout".
+ */
+fun isShallowClone(dir: java.io.File): Boolean =
+    java.io.File(dir, ".git/shallow").isFile
+
+/**
+ * Ensure a sibling repository from the clj-android GitHub organization is
+ * available for use as an included build.
+ *
+ * - Missing or empty directories are cloned automatically (--depth 1).
+ * - Shallow clones (from a previous auto-clone) are updated with git pull
+ *   so they stay current when upstream pushes new commits.
+ * - Full (non-shallow) user checkouts are left untouched.
+ *
+ * Returns the directory if it contains a valid Gradle project, or null if
+ * cloning failed (in which case Gradle falls back to published artifacts
+ * from mavenLocal / remote repositories).
+ */
 fun ensureSibling(parent: java.io.File, name: String): java.io.File? {
     val dir = java.io.File(parent, name)
-    // Check for build.gradle.kts (not just directory existence) so that an empty
-    // or corrupt directory left by a failed clone is re-cloned automatically.
-    if (java.io.File(dir, "build.gradle.kts").isFile) return dir
+    val hasBuildFile = java.io.File(dir, "build.gradle.kts").isFile
 
+    if (hasBuildFile && isShallowClone(dir)) {
+        // Update our own auto-clone to pick up new commits.
+        try {
+            val proc = ProcessBuilder("git", "pull")
+                .directory(dir)
+                .redirectErrorStream(true)
+                .start()
+            proc.inputStream.bufferedReader().forEachLine { /* discard */ }
+            proc.waitFor()
+        } catch (_: Exception) {
+            // Non-fatal — the existing checkout is still usable.
+        }
+        return dir
+    }
+
+    if (hasBuildFile) return dir   // Full user checkout — use as-is.
+
+    // Missing, empty, or corrupt directory — (re-)clone from GitHub.
     println("Cloning $name from https://github.com/clj-android/$name.git ...")
     return try {
         if (dir.isDirectory) dir.deleteRecursively()
@@ -70,9 +85,16 @@ fun ensureSibling(parent: java.io.File, name: String): java.io.File? {
     }
 }
 
-// Build sibling projects from source when available.
-// Missing repositories are cloned automatically from GitHub.
-// Without these, artifacts must be published to mavenLocal first.
+// ---------------------------------------------------------------------------
+// Include sibling builds
+// ---------------------------------------------------------------------------
+
+// Gradle plugin (must be in pluginManagement to resolve plugin IDs).
+ensureSibling(file(".."), "android-clojure-plugin")?.let {
+    pluginManagement { includeBuild(it) }
+}
+
+// Library dependencies — built from source when available.
 listOf("neko", "runtime-core", "runtime-repl", "clojure-patched").forEach { name ->
     ensureSibling(file(".."), name)?.let { includeBuild(it) }
 }
