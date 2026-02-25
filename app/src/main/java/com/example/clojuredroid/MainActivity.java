@@ -183,7 +183,7 @@ public class MainActivity extends Activity {
         String[] probeClasses = {
                 "nrepl.server",          // would be AOT-compiled class
                 "nrepl.core",
-                "clojure_android.repl.server", // would be AOT-compiled class
+                "clj_android.repl.server", // would be AOT-compiled class
         };
         for (String cls : probeClasses) {
             // Check for .clj resource (nREPL ships as source, not AOT)
@@ -194,25 +194,25 @@ public class MainActivity extends Activity {
         }
 
         // Check if server namespace can be required (do this in background)
-        addLog("7. Requiring clojure-android.repl.server...", 0xFFCCCC00, false);
+        addLog("7. Requiring clj-android.repl.server...", 0xFFCCCC00, false);
         setNreplStatus("Loading nREPL namespace...", 0xFFCCCC00);
 
         new Thread(
                 Thread.currentThread().getThreadGroup(),
                 () -> {
                     try {
-                        Log.d(TAG, "Requiring clojure-android.repl.server namespace");
+                        Log.d(TAG, "Requiring clj-android.repl.server namespace");
                         long t0 = System.currentTimeMillis();
                         Object require = clojure.java.api.Clojure.var("clojure.core", "require");
                         ((clojure.lang.IFn) require).invoke(
-                                clojure.java.api.Clojure.read("clojure-android.repl.server"));
+                                clojure.java.api.Clojure.read("clj-android.repl.server"));
                         long ms = System.currentTimeMillis() - t0;
                         nreplNamespaceLoaded = true;
-                        Log.i(TAG, "clojure-android.repl.server required in " + ms + "ms");
+                        Log.i(TAG, "clj-android.repl.server required in " + ms + "ms");
 
                         // Check if a server is already running (from ClojureApp auto-start)
                         Object runningFn = clojure.java.api.Clojure.var(
-                                "clojure-android.repl.server", "running?");
+                                "clj-android.repl.server", "running?");
                         boolean alreadyRunning = (boolean) ((clojure.lang.IFn) runningFn).invoke();
 
                         runOnUiThread(() -> {
@@ -232,7 +232,7 @@ public class MainActivity extends Activity {
                             }
                         });
                     } catch (Throwable t) {
-                        Log.e(TAG, "Failed to require clojure-android.repl.server", t);
+                        Log.e(TAG, "Failed to require clj-android.repl.server", t);
                         runOnUiThread(() -> {
                             addLog("   FAILED: " + t.getClass().getName()
                                     + ": " + t.getMessage(), 0xFFFF0000, false);
@@ -337,18 +337,18 @@ public class MainActivity extends Activity {
                         Log.i(TAG, "User requested nREPL start on port " + port);
 
                         if (!nreplNamespaceLoaded) {
-                            logStep("Requiring clojure-android.repl.server...");
+                            logStep("Requiring clj-android.repl.server...");
                             long t0 = System.currentTimeMillis();
                             Object require = clojure.java.api.Clojure.var("clojure.core", "require");
                             ((clojure.lang.IFn) require).invoke(
-                                    clojure.java.api.Clojure.read("clojure-android.repl.server"));
+                                    clojure.java.api.Clojure.read("clj-android.repl.server"));
                             nreplNamespaceLoaded = true;
                             logStep("Namespace loaded (" + (System.currentTimeMillis() - t0) + "ms)");
                         }
 
                         logStep("Resolving start function...");
                         Object startFn = clojure.java.api.Clojure.var(
-                                "clojure-android.repl.server", "start");
+                                "clj-android.repl.server", "start");
 
                         logStep("Calling (start " + port + ")...");
                         long t0 = System.currentTimeMillis();
@@ -398,7 +398,7 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             try {
                 Object stopFn = clojure.java.api.Clojure.var(
-                        "clojure-android.repl.server", "stop");
+                        "clj-android.repl.server", "stop");
                 Object result = ((clojure.lang.IFn) stopFn).invoke();
                 Log.i(TAG, "nREPL stopped, result=" + result);
 

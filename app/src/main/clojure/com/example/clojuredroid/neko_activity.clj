@@ -19,7 +19,7 @@
             [neko.log :as log])
   (:import android.app.Activity
            android.widget.TextView
-           org.clojure_android.runtime.ClojureActivity))
+           com.goodanser.clj_android.runtime.ClojureActivity))
 
 ;; Atom holding the current Activity instance. Set by make-ui
 ;; so that REPL callers can reload the UI without passing it explicitly.

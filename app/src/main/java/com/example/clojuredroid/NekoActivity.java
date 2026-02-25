@@ -1,6 +1,6 @@
 package com.example.clojuredroid;
 
-import org.clojure_android.runtime.ClojureActivity;
+import com.goodanser.clj_android.runtime.ClojureActivity;
 
 /**
  * Activity that demonstrates neko UI DSL for declarative Android UI.

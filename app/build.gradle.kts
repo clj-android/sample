@@ -1,6 +1,6 @@
 plugins {
     id("com.android.application")
-    id("org.clojure-android.android-clojure")
+    id("com.goodanser.clj-android.android-clojure")
 }
 
 android {
@@ -40,5 +40,5 @@ clojureOptions {
 
 dependencies {
     implementation("org.clojure:clojure:1.12.0")
-    implementation("org.clojure-android:neko:5.0.0-SNAPSHOT")
+    implementation("com.goodanser.clj-android:neko:5.0.0-SNAPSHOT")
 }

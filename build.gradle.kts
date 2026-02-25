@@ -1,7 +1,7 @@
 // Top-level build file
 plugins {
     id("com.android.application") version "8.9.0" apply false
-    id("org.clojure-android.android-clojure") version "0.5.0-SNAPSHOT" apply false
+    id("com.goodanser.clj-android.android-clojure") version "0.5.0-SNAPSHOT" apply false
 }
 
 // When Android libraries are consumed via composite builds (includeBuild),
