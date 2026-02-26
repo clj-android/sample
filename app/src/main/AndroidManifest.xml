@@ -6,7 +6,7 @@
         android:label="Clojure Android Sample"
         android:supportsRtl="true">
         <activity
-            android:name=".NekoActivity"
+            android:name=".MainActivity"
             android:label="Neko UI Demo"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
             android:exported="true">
@@ -16,7 +16,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".MainActivity"
+            android:name=".TestActivity"
             android:label="Validation Tests"
             android:exported="true" />
     </application>

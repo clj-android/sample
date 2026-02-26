@@ -60,7 +60,7 @@ Install and launch on a connected device or emulator:
 
 ```bash
 ./gradlew installDebug
-adb shell am start -n com.example.clojuredroid/.NekoActivity
+adb shell am start -n com.example.clojuredroid/.MainActivity
 ```
 
 ## Connecting to the nREPL
@@ -76,7 +76,7 @@ Then connect from any nREPL client (Calva, CIDER, `lein repl :connect`, etc.) to
 Example — hot-reload the UI from the REPL:
 
 ```clojure
-(require '[com.example.clojuredroid.neko-activity :as ui])
+(require '[com.example.clojuredroid.main-activity :as ui])
 
 (reset! ui/*ui-tree
   [:linear-layout {:orientation :vertical :padding [32 32 32 32]}

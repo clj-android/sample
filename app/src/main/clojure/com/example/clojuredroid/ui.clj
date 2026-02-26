@@ -68,7 +68,7 @@
   "Hot-reload the UI from the REPL. Delegates to Java for reliable
   UI-thread dispatch."
   []
-  (-> (Class/forName "com.example.clojuredroid.NekoActivity")
+  (-> (Class/forName "com.example.clojuredroid.MainActivity")
       (.getMethod "reloadUi" (into-array Class []))
       (.invoke nil (into-array Object []))))
 
