@@ -205,13 +205,13 @@
       "nrepl-stop")))
 
 (defn- sync-nrepl-status!
-  "Polls for nREPL auto-start completion and updates the UI once detected.
-  Handles the case where ClojureApp starts nREPL before the Activity loads."
+  "Polls for nREPL auto-start completion and updates the UI.
+  Shows 'Starting...' while loading, then 'Running' once ready."
   []
   (.start
     (Thread.
       (fn []
-        (loop [waited 0]
+        (loop [waited 0 shown-starting? false]
           (let [ns-ready  (nrepl-var-loaded?)
                 running?  (and ns-ready
                                (when-let [f (find-nrepl-var "running?")] (f)))
@@ -219,7 +219,7 @@
             (when ns-ready
               (reset! nrepl-ns-loaded? true))
             (cond
-              ;; Server running and UI ready — update and exit
+              ;; Server running and UI ready — show Running and exit
               (and running? ui-ready?)
               (do (nrepl-set-status! "Running on port 7888" 0xFF00CC00)
                   (nrepl-set-buttons! false true))
@@ -227,10 +227,14 @@
               ;; Timeout after 60 seconds
               (>= waited 60000) nil
 
-              ;; Keep polling
+              ;; Keep polling; show Starting... once UI is ready
               :else
-              (do (Thread/sleep 2000)
-                  (recur (+ waited 2000)))))))
+              (do (when (and ui-ready? (not shown-starting?))
+                    (nrepl-set-status! "Starting..." 0xFFCCCC00)
+                    (nrepl-set-buttons! false false))
+                  (Thread/sleep 2000)
+                  (recur (+ waited 2000)
+                         (or shown-starting? ui-ready?)))))))
       "nrepl-status-sync")))
 
 (reset! *ui-tree
