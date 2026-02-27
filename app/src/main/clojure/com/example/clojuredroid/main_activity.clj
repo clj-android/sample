@@ -105,11 +105,23 @@
       (when (<= 1 p 65535) p))
     (catch NumberFormatException _ nil)))
 
+(defn- find-nrepl-var
+  "Looks up a var in clj-android.repl.server via direct Java interop.
+  Returns the var if the namespace exists and the var is interned and
+  bound, nil otherwise.  Bypasses resolve which fails from AOT-compiled
+  code on some Android devices."
+  [var-name]
+  (when-let [ns (clojure.lang.Namespace/find
+                  (clojure.lang.Symbol/intern "clj-android.repl.server"))]
+    (when-let [v (.findInternedVar ns (clojure.lang.Symbol/intern (str var-name)))]
+      (when (.isBound v)
+        v))))
+
 (defn- nrepl-var-loaded?
-  "True when clj-android.repl.server/start is defined — meaning the
-  namespace is fully loaded, not just partially created."
+  "True when clj-android.repl.server/start is defined and bound —
+  meaning the namespace is fully loaded, not just partially created."
   []
-  (some? (resolve 'clj-android.repl.server/start)))
+  (some? (find-nrepl-var "start")))
 
 (defn- ensure-nrepl-ns!
   "Ensures clj-android.repl.server is fully loaded.  Avoids concurrent
@@ -159,9 +171,12 @@
                   ;; Check if the server is already running (e.g. from ClojureApp
                   ;; auto-start) before calling start to avoid EADDRINUSE errors.
                   (if (and (nrepl-var-loaded?)
-                           ((resolve 'clj-android.repl.server/running?)))
+                           (when-let [f (find-nrepl-var "running?")] (f)))
                     (nrepl-set-status! (str "Running on port " port) 0xFF00CC00)
-                    ((resolve 'clj-android.repl.server/start) port))
+                    (if-let [start-fn (find-nrepl-var "start")]
+                      (start-fn port)
+                      (throw (RuntimeException.
+                               "nREPL namespace loaded but start var not found"))))
                   (nrepl-set-status! (str "Running on port " port) 0xFF00CC00)
                   (nrepl-set-buttons! false true)
                   (catch Throwable t
@@ -178,8 +193,8 @@
     (Thread.
       (fn []
         (try
-          (when @nrepl-ns-loaded?
-            ((resolve 'clj-android.repl.server/stop)))
+          (when-let [stop-fn (find-nrepl-var "stop")]
+            (stop-fn))
           (nrepl-set-status! "Stopped" 0xFFAAAAAA)
           (nrepl-set-error! "")
           (nrepl-set-buttons! true false)
@@ -188,6 +203,35 @@
             (nrepl-set-error! (.getMessage t))
             (nrepl-set-buttons! false true))))
       "nrepl-stop")))
+
+(defn- sync-nrepl-status!
+  "Polls for nREPL auto-start completion and updates the UI once detected.
+  Handles the case where ClojureApp starts nREPL before the Activity loads."
+  []
+  (.start
+    (Thread.
+      (fn []
+        (loop [waited 0]
+          (let [ns-ready  (nrepl-var-loaded?)
+                running?  (and ns-ready
+                               (when-let [f (find-nrepl-var "running?")] (f)))
+                ui-ready? (some? @*root-view)]
+            (when ns-ready
+              (reset! nrepl-ns-loaded? true))
+            (cond
+              ;; Server running and UI ready — update and exit
+              (and running? ui-ready?)
+              (do (nrepl-set-status! "Running on port 7888" 0xFF00CC00)
+                  (nrepl-set-buttons! false true))
+
+              ;; Timeout after 60 seconds
+              (>= waited 60000) nil
+
+              ;; Keep polling
+              :else
+              (do (Thread/sleep 2000)
+                  (recur (+ waited 2000)))))))
+      "nrepl-status-sync")))
 
 (reset! *ui-tree
         [:linear-layout {:id-holder true
@@ -241,3 +285,6 @@
                       :text-size [14 :sp]
                       :text-color (unchecked-int 0xFFFF0000)
                       :padding [0 4 0 0]}]])
+
+;; Detect nREPL auto-started by ClojureApp and sync the UI status.
+(sync-nrepl-status!)
