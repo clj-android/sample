@@ -105,13 +105,19 @@
       (when (<= 1 p 65535) p))
     (catch NumberFormatException _ nil)))
 
+(defn- nrepl-var-loaded?
+  "True when clj-android.repl.server/start is defined — meaning the
+  namespace is fully loaded, not just partially created."
+  []
+  (some? (resolve 'clj-android.repl.server/start)))
+
 (defn- ensure-nrepl-ns!
-  "Ensures clj-android.repl.server is loaded.  Avoids concurrent require
-  with ClojureApp's auto-start thread by checking find-ns first, and
-  falling back to a poll loop if our require hits a race condition."
+  "Ensures clj-android.repl.server is fully loaded.  Avoids concurrent
+  require with ClojureApp's auto-start thread by probing the start var,
+  and falling back to a poll loop if our require hits a race condition."
   []
   (when-not @nrepl-ns-loaded?
-    (if (find-ns 'clj-android.repl.server)
+    (if (nrepl-var-loaded?)
       (reset! nrepl-ns-loaded? true)
       (try
         (require 'clj-android.repl.server)
@@ -121,7 +127,7 @@
           (nrepl-set-status! "Waiting for nREPL to load..." 0xFFCCCC00)
           (loop [waited 0]
             (cond
-              (find-ns 'clj-android.repl.server)
+              (nrepl-var-loaded?)
               (reset! nrepl-ns-loaded? true)
 
               (>= waited 30000)
@@ -150,7 +156,12 @@
                   (when-not @nrepl-ns-loaded?
                     (nrepl-set-status! "Loading nREPL..." 0xFFCCCC00)
                     (ensure-nrepl-ns!))
-                  ((resolve 'clj-android.repl.server/start) port)
+                  ;; Check if the server is already running (e.g. from ClojureApp
+                  ;; auto-start) before calling start to avoid EADDRINUSE errors.
+                  (if (and (nrepl-var-loaded?)
+                           ((resolve 'clj-android.repl.server/running?)))
+                    (nrepl-set-status! (str "Running on port " port) 0xFF00CC00)
+                    ((resolve 'clj-android.repl.server/start) port))
                   (nrepl-set-status! (str "Running on port " port) 0xFF00CC00)
                   (nrepl-set-buttons! false true)
                   (catch Throwable t
