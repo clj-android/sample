@@ -105,6 +105,33 @@
       (when (<= 1 p 65535) p))
     (catch NumberFormatException _ nil)))
 
+(defn- ensure-nrepl-ns!
+  "Ensures clj-android.repl.server is loaded.  Avoids concurrent require
+  with ClojureApp's auto-start thread by checking find-ns first, and
+  falling back to a poll loop if our require hits a race condition."
+  []
+  (when-not @nrepl-ns-loaded?
+    (if (find-ns 'clj-android.repl.server)
+      (reset! nrepl-ns-loaded? true)
+      (try
+        (require 'clj-android.repl.server)
+        (reset! nrepl-ns-loaded? true)
+        (catch Throwable _
+          ;; Concurrent require from ClojureApp auto-start — wait for it
+          (nrepl-set-status! "Waiting for nREPL to load..." 0xFFCCCC00)
+          (loop [waited 0]
+            (cond
+              (find-ns 'clj-android.repl.server)
+              (reset! nrepl-ns-loaded? true)
+
+              (>= waited 30000)
+              (throw (RuntimeException.
+                       "Timed out waiting for nREPL namespace to load"))
+
+              :else
+              (do (Thread/sleep 1000)
+                  (recur (+ waited 1000))))))))))
+
 (defn- on-start-nrepl [_view]
   (when-let [root @*root-view]
     (let [port (some-> (find-view root ::nrepl-port-input)
@@ -122,8 +149,7 @@
                 (try
                   (when-not @nrepl-ns-loaded?
                     (nrepl-set-status! "Loading nREPL..." 0xFFCCCC00)
-                    (require 'clj-android.repl.server)
-                    (reset! nrepl-ns-loaded? true))
+                    (ensure-nrepl-ns!))
                   ((resolve 'clj-android.repl.server/start) port)
                   (nrepl-set-status! (str "Running on port " port) 0xFF00CC00)
                   (nrepl-set-buttons! false true)
