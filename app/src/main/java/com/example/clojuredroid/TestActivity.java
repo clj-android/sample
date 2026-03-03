@@ -1,74 +1,41 @@
 package com.example.clojuredroid;
 
-import android.app.Activity;
 import android.graphics.Typeface;
-import android.os.Bundle;
 import android.util.Log;
-import android.view.Gravity;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import com.goodanser.clj_android.runtime.ClojureActivity;
+
 /**
  * Diagnostic activity that validates the Clojure runtime on Android ART
  * and provides interactive nREPL server controls.
  *
- * Tests:
- * 1. Clojure RT initialization
- * 2. Clojure API access
- * 3. Basic Clojure evaluation
- * 4. AOT-compiled namespace loading
- * 5. Clojure function call
- * 6. Classloader inspection
- * 7. Interactive nREPL controls (port, start, stop)
+ * Extends ClojureActivity, which auto-requires the Clojure namespace
+ * com.example.clojuredroid.test-activity and delegates lifecycle calls.
+ * Java tests 1-6 validate Java↔Clojure interop; nREPL diagnostics
+ * and controls are handled by the Clojure namespace.
  */
-public class TestActivity extends Activity {
+public class TestActivity extends ClojureActivity {
     private static final String TAG = "ClojureDroid";
-    private static final int DEFAULT_PORT = 7888;
 
-    private LinearLayout logLayout;
-    private ScrollView scrollView;
-    private TextView nreplStatusView;
-    private Button startButton;
-    private Button stopButton;
-    private EditText portInput;
+    // Public fields set by test_activity.clj during on-create
+    public LinearLayout logLayout;
+    public ScrollView scrollView;
+    public TextView nreplStatusView;
+    public Button startButton;
+    public Button stopButton;
+    public EditText portInput;
 
-    // Track whether nREPL namespace has been required
-    private volatile boolean nreplNamespaceLoaded = false;
-    private volatile boolean isDebugBuild = false;
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(32, 32, 32, 32);
-
-        // -- Scrollable log area --
-        scrollView = new ScrollView(this);
-        scrollView.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f));
-        logLayout = new LinearLayout(this);
-        logLayout.setOrientation(LinearLayout.VERTICAL);
-        scrollView.addView(logLayout);
-        root.addView(scrollView);
-
-        // -- Separator --
-        root.addView(makeSeparator());
-
-        // -- nREPL control panel --
-        root.addView(makeNreplPanel());
-
-        setContentView(root);
-
-        // Run validation tests
-        runTests();
-    }
-
-    private void runTests() {
+    /**
+     * Runs Java↔Clojure interop diagnostic tests 1-6.
+     * Returns true if basic runtime tests passed (RT + API accessible),
+     * false if a critical failure prevents nREPL from working.
+     */
+    public boolean runTests() {
         addLog("=== Clojure-Android Diagnostics ===", 0xFFFFFFFF, true);
         addLog("VM: " + System.getProperty("java.vm.name") + " "
                 + System.getProperty("java.vm.version"), 0xFFAAAAAA, false);
@@ -83,8 +50,7 @@ public class TestActivity extends Activity {
         } catch (Throwable t) {
             addLog("1. RT class load FAILED: " + t, 0xFFFF0000, false);
             Log.e(TAG, "RT load failed", t);
-            setNreplStatus("Cannot start — Clojure RT not available", 0xFFFF0000);
-            return;
+            return false;
         }
 
         // Test 2: Clojure API accessible
@@ -96,8 +62,7 @@ public class TestActivity extends Activity {
         } catch (Throwable t) {
             addLog("2. Clojure API FAILED: " + t, 0xFFFF0000, false);
             Log.e(TAG, "Clojure API failed", t);
-            setNreplStatus("Cannot start — Clojure API not available", 0xFFFF0000);
-            return;
+            return false;
         }
 
         // Test 3: Basic Clojure evaluation
@@ -156,7 +121,6 @@ public class TestActivity extends Activity {
             // Probe for AndroidDynamicClassLoader
             try {
                 Class<?> adcl = Class.forName("clojure.lang.AndroidDynamicClassLoader");
-                isDebugBuild = true;
                 addLog("   AndroidDynamicClassLoader: present (super="
                         + adcl.getSuperclass().getName() + ")", 0xFF00CC00, false);
             } catch (ClassNotFoundException e) {
@@ -166,262 +130,12 @@ public class TestActivity extends Activity {
             addLog("6. Classloader check FAILED: " + t, 0xFFFF0000, false);
         }
 
-        // Test 7: Probe nREPL namespace availability
-        addLog("", 0, false); // spacer
-        addLog("=== nREPL Diagnostics ===", 0xFFFFFFFF, true);
-
-        if (!isDebugBuild) {
-            addLog("7. Release build — nREPL infrastructure not available", 0xFFFF8800, false);
-            setNreplStatus("Release build — nREPL not available", 0xFFFF8800);
-            startButton.setEnabled(false);
-            stopButton.setEnabled(false);
-            portInput.setEnabled(false);
-            return;
-        }
-
-        // Check for nREPL classes in the APK
-        String[] probeClasses = {
-                "nrepl.server",          // would be AOT-compiled class
-                "nrepl.core",
-                "clj_android.repl.server", // would be AOT-compiled class
-        };
-        for (String cls : probeClasses) {
-            // Check for .clj resource (nREPL ships as source, not AOT)
-            String resource = cls.replace('.', '/') + ".clj";
-            boolean found = getClass().getClassLoader().getResource(resource) != null;
-            addLog("   Resource " + resource + ": " + (found ? "found" : "MISSING"),
-                    found ? 0xFF00CC00 : 0xFFFF0000, false);
-        }
-
-        // Check if server namespace can be required (do this in background)
-        addLog("7. Requiring clj-android.repl.server...", 0xFFCCCC00, false);
-        setNreplStatus("Loading nREPL namespace...", 0xFFCCCC00);
-
-        new Thread(
-                Thread.currentThread().getThreadGroup(),
-                () -> {
-                    try {
-                        Log.d(TAG, "Requiring clj-android.repl.server namespace");
-                        long t0 = System.currentTimeMillis();
-                        Object require = clojure.java.api.Clojure.var("clojure.core", "require");
-                        ((clojure.lang.IFn) require).invoke(
-                                clojure.java.api.Clojure.read("clj-android.repl.server"));
-                        long ms = System.currentTimeMillis() - t0;
-                        nreplNamespaceLoaded = true;
-                        Log.i(TAG, "clj-android.repl.server required in " + ms + "ms");
-
-                        // Check if a server is already running (from ClojureApp auto-start)
-                        Object runningFn = clojure.java.api.Clojure.var(
-                                "clj-android.repl.server", "running?");
-                        boolean alreadyRunning = (boolean) ((clojure.lang.IFn) runningFn).invoke();
-
-                        runOnUiThread(() -> {
-                            addLog("   Namespace loaded (" + ms + "ms)", 0xFF00CC00, false);
-                            if (alreadyRunning) {
-                                addLog("   Server already running (auto-started by ClojureApp)",
-                                        0xFF00CC00, false);
-                                setNreplStatus("Running on port " + DEFAULT_PORT
-                                        + " (auto-started)", 0xFF00CC00);
-                                startButton.setEnabled(false);
-                                stopButton.setEnabled(true);
-                            } else {
-                                addLog("   Ready — press Start to launch nREPL", 0xFF00CC00, false);
-                                setNreplStatus("Ready — press Start", 0xFF00CC00);
-                                startButton.setEnabled(true);
-                                stopButton.setEnabled(false);
-                            }
-                        });
-                    } catch (Throwable t) {
-                        Log.e(TAG, "Failed to require clj-android.repl.server", t);
-                        runOnUiThread(() -> {
-                            addLog("   FAILED: " + t.getClass().getName()
-                                    + ": " + t.getMessage(), 0xFFFF0000, false);
-                            // Show cause chain
-                            Throwable cause = t.getCause();
-                            int depth = 0;
-                            while (cause != null && depth < 5) {
-                                addLog("     caused by: " + cause.getClass().getName()
-                                        + ": " + cause.getMessage(), 0xFFFF0000, false);
-                                cause = cause.getCause();
-                                depth++;
-                            }
-                            setNreplStatus("Failed to load nREPL namespace", 0xFFFF0000);
-                            startButton.setEnabled(false);
-                        });
-                    }
-                },
-                "nREPL-require",
-                1048576 // 1MB stack
-        ).start();
+        return true;
     }
 
-    // ---- nREPL control panel ----
+    // ---- UI helpers (called from test_activity.clj) ----
 
-    private LinearLayout makeNreplPanel() {
-        LinearLayout panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(0, 16, 0, 0);
-
-        // Status line
-        nreplStatusView = new TextView(this);
-        nreplStatusView.setText("nREPL: checking...");
-        nreplStatusView.setTextSize(16);
-        nreplStatusView.setTypeface(Typeface.DEFAULT_BOLD);
-        nreplStatusView.setTextColor(0xFFCCCC00);
-        nreplStatusView.setPadding(0, 8, 0, 8);
-        panel.addView(nreplStatusView);
-
-        // Port row: label + input
-        LinearLayout portRow = new LinearLayout(this);
-        portRow.setOrientation(LinearLayout.HORIZONTAL);
-        portRow.setGravity(Gravity.CENTER_VERTICAL);
-
-        TextView portLabel = new TextView(this);
-        portLabel.setText("Port: ");
-        portLabel.setTextSize(16);
-        portLabel.setTextColor(0xFFCCCCCC);
-        portRow.addView(portLabel);
-
-        portInput = new EditText(this);
-        portInput.setText(String.valueOf(DEFAULT_PORT));
-        portInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-        portInput.setTextSize(16);
-        portInput.setMinimumWidth(200);
-        portInput.setTextColor(0xFFFFFFFF);
-        portRow.addView(portInput);
-
-        panel.addView(portRow);
-
-        // Button row
-        LinearLayout buttonRow = new LinearLayout(this);
-        buttonRow.setOrientation(LinearLayout.HORIZONTAL);
-        buttonRow.setPadding(0, 8, 0, 0);
-
-        startButton = new Button(this);
-        startButton.setText("Start nREPL");
-        startButton.setEnabled(false); // enabled after namespace loads
-        startButton.setOnClickListener(v -> onStartNrepl());
-        buttonRow.addView(startButton);
-
-        stopButton = new Button(this);
-        stopButton.setText("Stop nREPL");
-        stopButton.setEnabled(false);
-        stopButton.setOnClickListener(v -> onStopNrepl());
-        buttonRow.addView(stopButton);
-
-        panel.addView(buttonRow);
-
-        return panel;
-    }
-
-    private void onStartNrepl() {
-        int port;
-        try {
-            port = Integer.parseInt(portInput.getText().toString().trim());
-            if (port < 1 || port > 65535) throw new NumberFormatException();
-        } catch (NumberFormatException e) {
-            setNreplStatus("Invalid port number", 0xFFFF0000);
-            return;
-        }
-
-        startButton.setEnabled(false);
-        portInput.setEnabled(false);
-        setNreplStatus("Starting nREPL on port " + port + "...", 0xFFCCCC00);
-        addLog("", 0, false);
-        addLog("Starting nREPL on port " + port + "...", 0xFFCCCC00, false);
-
-        new Thread(
-                Thread.currentThread().getThreadGroup(),
-                () -> {
-                    try {
-                        Log.i(TAG, "User requested nREPL start on port " + port);
-
-                        if (!nreplNamespaceLoaded) {
-                            logStep("Requiring clj-android.repl.server...");
-                            long t0 = System.currentTimeMillis();
-                            Object require = clojure.java.api.Clojure.var("clojure.core", "require");
-                            ((clojure.lang.IFn) require).invoke(
-                                    clojure.java.api.Clojure.read("clj-android.repl.server"));
-                            nreplNamespaceLoaded = true;
-                            logStep("Namespace loaded (" + (System.currentTimeMillis() - t0) + "ms)");
-                        }
-
-                        logStep("Resolving start function...");
-                        Object startFn = clojure.java.api.Clojure.var(
-                                "clj-android.repl.server", "start");
-
-                        logStep("Calling (start " + port + ")...");
-                        long t0 = System.currentTimeMillis();
-                        Object server = ((clojure.lang.IFn) startFn).invoke(port);
-                        long ms = System.currentTimeMillis() - t0;
-
-                        Log.i(TAG, "nREPL started on port " + port + " in " + ms
-                                + "ms, server=" + server);
-
-                        runOnUiThread(() -> {
-                            addLog("nREPL started on port " + port + " (" + ms + "ms)",
-                                    0xFF00CC00, false);
-                            addLog("Connect: adb forward tcp:" + port + " tcp:" + port,
-                                    0xFF00CC00, false);
-                            setNreplStatus("Running on port " + port, 0xFF00CC00);
-                            stopButton.setEnabled(true);
-                        });
-                    } catch (Throwable t) {
-                        Log.e(TAG, "nREPL start failed", t);
-                        runOnUiThread(() -> {
-                            addLog("nREPL start FAILED: " + t.getClass().getName()
-                                    + ": " + t.getMessage(), 0xFFFF0000, false);
-                            Throwable cause = t.getCause();
-                            int depth = 0;
-                            while (cause != null && depth < 5) {
-                                addLog("  caused by: " + cause.getClass().getName()
-                                        + ": " + cause.getMessage(), 0xFFFF0000, false);
-                                cause = cause.getCause();
-                                depth++;
-                            }
-                            setNreplStatus("Start failed — see log above", 0xFFFF0000);
-                            startButton.setEnabled(true);
-                            portInput.setEnabled(true);
-                        });
-                    }
-                },
-                "nREPL-start",
-                1048576
-        ).start();
-    }
-
-    private void onStopNrepl() {
-        stopButton.setEnabled(false);
-        setNreplStatus("Stopping...", 0xFFCCCC00);
-        addLog("Stopping nREPL server...", 0xFFCCCC00, false);
-
-        new Thread(() -> {
-            try {
-                Object stopFn = clojure.java.api.Clojure.var(
-                        "clj-android.repl.server", "stop");
-                Object result = ((clojure.lang.IFn) stopFn).invoke();
-                Log.i(TAG, "nREPL stopped, result=" + result);
-
-                runOnUiThread(() -> {
-                    addLog("nREPL server stopped", 0xFF00CC00, false);
-                    setNreplStatus("Stopped — press Start to restart", 0xFFAAAAAA);
-                    startButton.setEnabled(true);
-                    portInput.setEnabled(true);
-                });
-            } catch (Throwable t) {
-                Log.e(TAG, "nREPL stop failed", t);
-                runOnUiThread(() -> {
-                    addLog("nREPL stop FAILED: " + t.getMessage(), 0xFFFF0000, false);
-                    setNreplStatus("Stop failed", 0xFFFF0000);
-                    stopButton.setEnabled(true);
-                });
-            }
-        }, "nREPL-stop").start();
-    }
-
-    // ---- UI helpers ----
-
-    private android.view.View makeSeparator() {
+    public android.view.View makeSeparator() {
         android.view.View sep = new android.view.View(this);
         sep.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 2));
@@ -429,7 +143,7 @@ public class TestActivity extends Activity {
         return sep;
     }
 
-    private void addLog(String text, int color, boolean bold) {
+    public void addLog(String text, int color, boolean bold) {
         TextView tv = new TextView(this);
         tv.setText(text);
         tv.setTextSize(13);
@@ -447,13 +161,15 @@ public class TestActivity extends Activity {
     }
 
     /** Log a step from a background thread to both UI and logcat. */
-    private void logStep(String msg) {
+    public void logStep(String msg) {
         Log.d(TAG, msg);
         runOnUiThread(() -> addLog("  " + msg, 0xFF888888, false));
     }
 
-    private void setNreplStatus(String text, int color) {
-        nreplStatusView.setText("nREPL: " + text);
-        nreplStatusView.setTextColor(color);
+    public void setNreplStatus(String text, int color) {
+        if (nreplStatusView != null) {
+            nreplStatusView.setText("nREPL: " + text);
+            nreplStatusView.setTextColor(color);
+        }
     }
 }

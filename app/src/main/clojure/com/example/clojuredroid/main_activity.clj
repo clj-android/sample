@@ -16,7 +16,8 @@
     (ui/reload-ui!)"
   (:require [neko.ui :as ui]
             [neko.find-view :refer [find-view]]
-            [neko.log :as log])
+            [neko.log :as log]
+            [clj-android.repl.server :as repl-server])
   (:import android.app.Activity
            android.widget.EditText
            android.widget.TextView
@@ -31,8 +32,6 @@
 (defonce *root-view (atom nil))
 
 (def ^:private counter (atom 0))
-
-(defonce ^:private nrepl-ns-loaded? (atom false))
 
 ;;  Update this atom from the REPL to change the UI layout.
 (defonce *ui-tree
@@ -105,51 +104,6 @@
       (when (<= 1 p 65535) p))
     (catch NumberFormatException _ nil)))
 
-(defn- find-nrepl-var
-  "Looks up a var in clj-android.repl.server via direct Java interop.
-  Returns the var if the namespace exists and the var is interned and
-  bound, nil otherwise.  Bypasses resolve which fails from AOT-compiled
-  code on some Android devices."
-  [var-name]
-  (when-let [ns (clojure.lang.Namespace/find
-                  (clojure.lang.Symbol/intern "clj-android.repl.server"))]
-    (when-let [v (.findInternedVar ns (clojure.lang.Symbol/intern (str var-name)))]
-      (when (.isBound v)
-        v))))
-
-(defn- nrepl-var-loaded?
-  "True when clj-android.repl.server/start is defined and bound —
-  meaning the namespace is fully loaded, not just partially created."
-  []
-  (some? (find-nrepl-var "start")))
-
-(defn- ensure-nrepl-ns!
-  "Ensures clj-android.repl.server is fully loaded.  Avoids concurrent
-  require with ClojureApp's auto-start thread by probing the start var,
-  and falling back to a poll loop if our require hits a race condition."
-  []
-  (when-not @nrepl-ns-loaded?
-    (if (nrepl-var-loaded?)
-      (reset! nrepl-ns-loaded? true)
-      (try
-        (require 'clj-android.repl.server)
-        (reset! nrepl-ns-loaded? true)
-        (catch Throwable _
-          ;; Concurrent require from ClojureApp auto-start — wait for it
-          (nrepl-set-status! "Waiting for nREPL to load..." 0xFFCCCC00)
-          (loop [waited 0]
-            (cond
-              (nrepl-var-loaded?)
-              (reset! nrepl-ns-loaded? true)
-
-              (>= waited 30000)
-              (throw (RuntimeException.
-                       "Timed out waiting for nREPL namespace to load"))
-
-              :else
-              (do (Thread/sleep 1000)
-                  (recur (+ waited 1000))))))))))
-
 (defn- on-start-nrepl [_view]
   (when-let [root @*root-view]
     (let [port (some-> (find-view root ::nrepl-port-input)
@@ -165,19 +119,14 @@
               (.getThreadGroup (Thread/currentThread))
               (fn []
                 (try
-                  (when-not @nrepl-ns-loaded?
-                    (nrepl-set-status! "Loading nREPL..." 0xFFCCCC00)
-                    (ensure-nrepl-ns!))
-                  ;; Check if the server is already running (e.g. from ClojureApp
-                  ;; auto-start) before calling start to avoid EADDRINUSE errors.
-                  (if (and (nrepl-var-loaded?)
-                           (when-let [f (find-nrepl-var "running?")] (f)))
-                    (nrepl-set-status! (str "Running on port " port) 0xFF00CC00)
-                    (if-let [start-fn (find-nrepl-var "start")]
-                      (start-fn port)
-                      (throw (RuntimeException.
-                               "nREPL namespace loaded but start var not found"))))
-                  (nrepl-set-status! (str "Running on port " port) 0xFF00CC00)
+                  (if (repl-server/running?)
+                    (nrepl-set-status! (str "Running on port "
+                                            (or (repl-server/port) port))
+                                       0xFF00CC00)
+                    (repl-server/start port))
+                  (nrepl-set-status! (str "Running on port "
+                                          (or (repl-server/port) port))
+                                     0xFF00CC00)
                   (nrepl-set-buttons! false true)
                   (catch Throwable t
                     (nrepl-set-status! "Error" 0xFFFF0000)
@@ -193,8 +142,7 @@
     (Thread.
       (fn []
         (try
-          (when-let [stop-fn (find-nrepl-var "stop")]
-            (stop-fn))
+          (repl-server/stop)
           (nrepl-set-status! "Stopped" 0xFFAAAAAA)
           (nrepl-set-error! "")
           (nrepl-set-buttons! true false)
@@ -205,36 +153,28 @@
       "nrepl-stop")))
 
 (defn- sync-nrepl-status!
-  "Polls for nREPL auto-start completion and updates the UI.
+  "Waits for nREPL auto-start completion and updates the UI.
   Shows 'Starting...' while loading, then 'Running' once ready."
   []
   (.start
     (Thread.
       (fn []
-        (loop [waited 0 shown-starting? false]
-          (let [ns-ready  (nrepl-var-loaded?)
-                running?  (and ns-ready
-                               (when-let [f (find-nrepl-var "running?")] (f)))
-                ui-ready? (some? @*root-view)]
-            (when ns-ready
-              (reset! nrepl-ns-loaded? true))
-            (cond
-              ;; Server running and UI ready — show Running and exit
-              (and running? ui-ready?)
-              (do (nrepl-set-status! "Running on port 7888" 0xFF00CC00)
-                  (nrepl-set-buttons! false true))
-
-              ;; Timeout after 60 seconds
-              (>= waited 60000) nil
-
-              ;; Keep polling; show Starting... once UI is ready
-              :else
-              (do (when (and ui-ready? (not shown-starting?))
-                    (nrepl-set-status! "Starting..." 0xFFCCCC00)
-                    (nrepl-set-buttons! false false))
-                  (Thread/sleep 2000)
-                  (recur (+ waited 2000)
-                         (or shown-starting? ui-ready?)))))))
+        ;; Wait for UI to be ready before showing status
+        (loop [waited 0]
+          (when (and (nil? @*root-view) (< waited 10000))
+            (Thread/sleep 500)
+            (recur (+ waited 500))))
+        (when @*root-view
+          (nrepl-set-status! "Starting..." 0xFFCCCC00)
+          (nrepl-set-buttons! false false)
+          (if (repl-server/wait-for-ready :timeout-ms 60000)
+            (let [p (or (repl-server/port) 7888)]
+              (nrepl-set-status! (str "Running on port " p) 0xFF00CC00)
+              (nrepl-set-buttons! false true))
+            ;; Timeout — server didn't start
+            (when-not (repl-server/running?)
+              (nrepl-set-status! "Stopped" 0xFFAAAAAA)
+              (nrepl-set-buttons! true false)))))
       "nrepl-status-sync")))
 
 (reset! *ui-tree
