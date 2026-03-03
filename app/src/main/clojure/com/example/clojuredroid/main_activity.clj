@@ -229,7 +229,6 @@
                       :content-description "Demo text with background color"}]
          ;; :hint on EditText
          [:edit-text {:hint "Type something here..."
-                      :text-size [16 :sp]
                       :padding [0 8 0 8]}]
          ;; :checked and :on-checked-change toggling :visibility
          [:check-box {:text "Show hidden message"
