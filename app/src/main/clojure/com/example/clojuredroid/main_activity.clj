@@ -19,7 +19,9 @@
             [neko.log :as log]
             [clj-android.repl.server :as repl-server])
   (:import android.app.Activity
+           android.view.View
            android.widget.EditText
+           android.widget.ProgressBar
            android.widget.TextView
            com.goodanser.clj_android.runtime.ClojureActivity))
 
@@ -177,6 +179,20 @@
               (nrepl-set-buttons! true false)))))
       "nrepl-status-sync")))
 
+;; --- New traits demo handlers ---
+
+(defn- on-toggle-visibility [_view is-checked]
+  (when-let [root @*root-view]
+    (when-let [^View v (find-view root ::hidden-message)]
+      (.setVisibility v (if is-checked View/VISIBLE View/GONE)))))
+
+(defn- on-seek-progress [_seek-bar progress _from-user]
+  (when-let [root @*root-view]
+    (when-let [^TextView label (find-view root ::seek-label)]
+      (.setText label (str "Progress: " progress "%")))
+    (when-let [^ProgressBar bar (find-view root ::demo-progress)]
+      (.setProgress bar (int progress)))))
+
 (reset! *ui-tree
         [:linear-layout {:id-holder true
                          :orientation :vertical
@@ -199,6 +215,46 @@
                                (reset! counter 0)
                                (.setText ^TextView (find-view @*root-view ::counter-display)
                                          "Counter: 0"))}]
+         ;; --- New traits demo ---
+         [:text-view {:text "New Traits Demo"
+                      :text-size [20 :sp]
+                      :padding [0 24 0 8]}]
+         ;; :background-color and :gravity
+         [:text-view {:text "Centered with background"
+                      :text-size [16 :sp]
+                      :gravity :center
+                      :background-color (unchecked-int 0xFF334455)
+                      :text-color (unchecked-int 0xFFFFFFFF)
+                      :padding [8 8 8 8]
+                      :content-description "Demo text with background color"}]
+         ;; :hint on EditText
+         [:edit-text {:hint "Type something here..."
+                      :text-size [16 :sp]
+                      :padding [0 8 0 8]}]
+         ;; :checked and :on-checked-change toggling :visibility
+         [:check-box {:text "Show hidden message"
+                      :checked false
+                      :text-size [16 :sp]
+                      :on-checked-change on-toggle-visibility}]
+         [:text-view {:id ::hidden-message
+                      :text "You found the hidden message!"
+                      :text-size [16 :sp]
+                      :text-color (unchecked-int 0xFF00CC00)
+                      :visibility :gone
+                      :padding [16 4 0 4]}]
+         ;; :progress on ProgressBar, :on-seek-bar-change on SeekBar
+         [:text-view {:id ::seek-label
+                      :text "Progress: 50%"
+                      :text-size [16 :sp]
+                      :padding [0 8 0 4]}]
+         [:seek-bar {:progress 50
+                     :max 100
+                     :on-seek-bar-change on-seek-progress}]
+         [:progress-bar {:id ::demo-progress
+                         :progress 50
+                         :max 100
+                         :layout-width :fill
+                         :padding [0 4 0 8]}]
          ;; --- nREPL section ---
          [:text-view {:text "nREPL Server"
                       :text-size [20 :sp]
