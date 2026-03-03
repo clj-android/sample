@@ -31,3 +31,34 @@ allprojects {
         }
     }
 }
+
+tasks.register("publishDepsToMavenLocal") {
+    group = "publishing"
+    description = "Build and publish all clj-android dependencies to Maven local"
+    doLast {
+        val depsDir = file("build/deps")
+        val order = listOf(
+            "clojure-patched",
+            "android-clojure-plugin",
+            "runtime-core",
+            "neko",
+            "runtime-repl"
+        )
+        for (name in order) {
+            val dir = File(depsDir, name)
+            if (!dir.isDirectory) {
+                logger.warn("Skipping $name — not found in build/deps/")
+                continue
+            }
+            logger.lifecycle("Publishing $name to Maven local...")
+            val proc = ProcessBuilder("./gradlew", "clean", "publishToMavenLocal")
+                .directory(dir)
+                .inheritIO()
+                .start()
+            val exitCode = proc.waitFor()
+            if (exitCode != 0) {
+                throw GradleException("publishToMavenLocal failed for $name (exit $exitCode)")
+            }
+        }
+    }
+}

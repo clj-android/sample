@@ -24,22 +24,21 @@ This app depends on several libraries from the [clj-android](https://github.com/
 | [runtime-repl](https://github.com/clj-android/runtime-repl) | nREPL server with on-device DEX compilation for REPL-driven development |
 | [clojure-patched](https://github.com/clj-android/clojure-patched) | Clojure 1.12.0 with Android-aware classloader (used automatically in debug builds) |
 
-Dependencies are resolved automatically: if sibling checkouts exist, Gradle builds them from source via composite builds; if not, they are **cloned automatically** from GitHub on the first build. No manual setup is required.
+Dependencies are resolved automatically: on the first build, `settings.gradle.kts` clones them from GitHub into `build/deps/` and includes them as Gradle composite builds. No manual setup is required.
 
-If cloning fails (e.g. no network), you can either clone the repositories manually:
+If you prefer to install dependencies to your local Maven repository instead of using composite builds:
 
 ```bash
-mkdir clojure-android && cd clojure-android
-for repo in sample android-clojure-plugin neko runtime-core runtime-repl clojure-patched; do
-  git clone https://github.com/clj-android/$repo.git
-done
+./gradlew publishDepsToMavenLocal
 ```
 
-or build and install each dependency to your local Maven repository:
+This cleans, builds, and publishes all five dependencies in the correct order. If cloning fails (e.g. no network), you can clone the repositories manually into `build/deps/`:
 
 ```bash
-# In each sibling project directory:
-./gradlew publishToMavenLocal
+mkdir -p build/deps
+for repo in android-clojure-plugin neko runtime-core runtime-repl clojure-patched; do
+  git clone https://github.com/clj-android/$repo.git build/deps/$repo
+done
 ```
 
 ## Building
