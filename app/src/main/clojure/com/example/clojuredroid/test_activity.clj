@@ -14,6 +14,8 @@
            android.widget.TextView
            com.example.clojuredroid.TestActivity))
 
+(declare on-start-nrepl on-stop-nrepl)
+
 (def ^:private default-port 7888)
 
 (defn- make-nrepl-panel
