@@ -32,6 +32,12 @@ allprojects {
     }
 }
 
+tasks.named("clean") {
+    doLast {
+        delete(file("build/deps"))
+    }
+}
+
 tasks.register("publishDepsToMavenLocal") {
     group = "publishing"
     description = "Build and publish all clj-android dependencies to Maven local"
