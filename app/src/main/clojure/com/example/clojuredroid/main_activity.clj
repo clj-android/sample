@@ -242,7 +242,8 @@
                         :layout-height 0
                         :layout-weight 1}
           [:linear-layout {:orientation :vertical
-                           :padding [32 32 32 32]}
+                           :padding [32 32 32 32]
+                           :layout-width :match-parent}
            [:text-view {:text "Clojure on Android"
                         :text-size [24 :sp]}]
            [:text-view {:text "Built with neko UI DSL"
