@@ -179,8 +179,6 @@
               (nrepl-set-buttons! true false)))))
       "nrepl-status-sync")))
 
-;; --- New traits demo handlers ---
-
 (defn- on-toggle-visibility [_view is-checked]
   (when-let [root @*root-view]
     (when-let [^View v (find-view root ::hidden-message)]
@@ -193,6 +191,14 @@
     (when-let [^ProgressBar bar (find-view root ::demo-progress)]
       (.setProgress bar (int progress)))))
 
+;; Detect nREPL auto-started by ClojureApp and sync the UI status.
+
+(add-watch *ui-tree :nrepl-status-watch
+           (fn [_key _ref _old _new]
+             (sync-nrepl-status!)))
+
+(def default-padding [12 12 12 12])
+
 (reset! *ui-tree
         [:linear-layout {:id-holder true
                          :orientation :vertical
@@ -203,33 +209,31 @@
                       :text-size [16 :sp]}]
          [:text-view {:text (str "Counter: " @counter)
                       :text-size [20 :sp]
-                      :padding [0 8 0 8]
+                      :padding default-padding
                       :id ::counter-display}]
-         [:button {:text "Increment"
-                   :on-click (fn [_]
-                               (let [v (swap! counter inc)]
-                                 (.setText ^TextView (find-view @*root-view ::counter-display)
-                                           (str "Counter: " v))))}]
-         [:button {:text "Reset"
-                   :on-click (fn [_]
-                               (reset! counter 0)
-                               (.setText ^TextView (find-view @*root-view ::counter-display)
-                                         "Counter: 0"))}]
-         ;; --- New traits demo ---
-         [:text-view {:text "New Traits Demo"
-                      :text-size [20 :sp]
-                      :padding [0 24 0 8]}]
+         [:linear-layout {:orientation :horizontal}
+          [:button {:text "Increment"
+                    :on-click (fn [_]
+                                (let [v (swap! counter inc)]
+                                  (.setText ^TextView (find-view @*root-view ::counter-display)
+                                            (str "Counter: " v))))}]
+          [:button {:text "Reset"
+                    :on-click (fn [_]
+                                (reset! counter 0)
+                                (.setText ^TextView (find-view @*root-view ::counter-display)
+                                          "Counter: 0"))}]]
          ;; :background-color and :gravity
          [:text-view {:text "Centered with background"
                       :text-size [16 :sp]
                       :gravity :center
                       :background-color (unchecked-int 0xFF334455)
                       :text-color (unchecked-int 0xFFFFFFFF)
-                      :padding [8 8 8 8]
+                      :padding default-padding
+                      :layout-width :fill
                       :content-description "Demo text with background color"}]
          ;; :hint on EditText
          [:edit-text {:hint "Type something here..."
-                      :padding [0 8 0 8]}]
+                      :padding default-padding}]
          ;; :checked and :on-checked-change toggling :visibility
          [:check-box {:text "Show hidden message"
                       :checked false
@@ -248,12 +252,8 @@
                       :padding [0 8 0 4]}]
          [:seek-bar {:progress 50
                      :max 100
+                     :layout-width :fill
                      :on-seek-bar-change on-seek-progress}]
-         [:progress-bar {:id ::demo-progress
-                         :progress 50
-                         :max 100
-                         :layout-width :fill
-                         :padding [0 4 0 8]}]
          ;; --- nREPL section ---
          [:text-view {:text "nREPL Server"
                       :text-size [20 :sp]
@@ -284,6 +284,3 @@
                       :text-size [14 :sp]
                       :text-color (unchecked-int 0xFFFF0000)
                       :padding [0 4 0 0]}]])
-
-;; Detect nREPL auto-started by ClojureApp and sync the UI status.
-(sync-nrepl-status!)
