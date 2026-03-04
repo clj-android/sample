@@ -32,10 +32,8 @@ allprojects {
     }
 }
 
-tasks.named("clean") {
-    doLast {
-        delete(file("build/deps"))
-    }
+tasks.register<Delete>("clean") {
+    delete(rootProject.layout.buildDirectory, file("build/deps"))
 }
 
 tasks.register("publishDepsToMavenLocal") {
