@@ -36,9 +36,6 @@
 ;; Button click handlers use this with find-view to locate child views.
 (defonce *root-view (atom nil))
 
-(def ^:private counter (cell 0))
-(def ^:private counter-text (cell= #(str "Counter: " @counter)))
-
 ;;  Update this atom from the REPL to change the UI layout.
 (defonce *ui-tree
   (atom [:linear-layout {:id-holder true
@@ -102,6 +99,7 @@
           nil)))))
 
 ;; --- nREPL controls ---
+;; These update values in the UI the old fashioned way
 
 (defn- run-on-ui! [f]
   (when-let [^Activity activity @*activity]
@@ -209,18 +207,6 @@
               (nrepl-set-buttons! true false)))))
       "nrepl-status-sync")))
 
-(defn- on-toggle-visibility [_view is-checked]
-  (when-let [root @*root-view]
-    (when-let [^View v (find-view root ::hidden-message)]
-      (.setVisibility v (if is-checked View/VISIBLE View/GONE)))))
-
-(defn- on-seek-progress [_seek-bar progress _from-user]
-  (when-let [root @*root-view]
-    (when-let [^TextView label (find-view root ::seek-label)]
-      (.setText label (str "Progress: " progress "%")))
-    (when-let [^ProgressBar bar (find-view root ::demo-progress)]
-      (.setProgress bar (int progress)))))
-
 ;; Detect nREPL auto-started by ClojureApp and sync the UI status.
 
 (add-watch *ui-tree :nrepl-status-watch
@@ -228,6 +214,22 @@
              (sync-nrepl-status!)))
 
 (def default-padding [12 12 12 12])
+
+
+;; Here, we use neko.reactive cells. Changing the value of a cell updates the UI.
+;; This is experimental, but it should make UI programming much nicer.
+;; cell is like an atom, cell= takes a function of zero arguments that references cells.
+;; Use the cell= as the value of a trait or attribute and the UI will track its value.
+
+(def ^:private counter (cell 0))
+(def ^:private counter-text* (cell= #(str "Counter: " @counter)))
+
+(def seek-progress (cell 50))
+(def seek-text* (cell= #(str "Progress: " @seek-progress "%")))
+(def seek* (cell= #(deref seek-progress)))
+
+(def show-message (cell false))
+(def show-message* (cell= #(if @show-message :visible :gone)))
 
 (reset! *ui-tree
         [:linear-layout {:id-holder true
@@ -247,7 +249,13 @@
                            :padding [32 32 32 32]
                            :layout-width :match-parent}
            [:text-view {:text "Clojure on Android"
-                        :text-size [24 :sp]}]
+                        :text-size [24 :sp]
+                        :gravity :center
+                        :background-color (unchecked-int 0xFF334455)
+                        :text-color (unchecked-int 0xFFFFFFFF)
+                        :padding [24 12 12 12]
+                        :layout-width :fill
+                        :content-description "Demo text with background color"}]
            [:text-view {:text "Built with neko UI DSL"
                         :text-size [16 :sp]}]
            [:text-view {:text counter-text
@@ -259,14 +267,7 @@
             [:button {:text "Reset"
                       :on-click (fn [_] (reset! counter 0))}]]
            ;; :background-color and :gravity
-           [:text-view {:text "Centered with background"
-                        :text-size [16 :sp]
-                        :gravity :center
-                        :background-color (unchecked-int 0xFF334455)
-                        :text-color (unchecked-int 0xFFFFFFFF)
-                        :padding default-padding
-                        :layout-width :fill
-                        :content-description "Demo text with background color"}]
+           
            ;; :hint on EditText
            [:edit-text {:hint "Type something here..."
                         :padding default-padding}]
@@ -274,22 +275,22 @@
            [:check-box {:text "Show hidden message"
                         :checked false
                         :text-size [16 :sp]
-                        :on-checked-change on-toggle-visibility}]
+                        :on-checked-change (fn [_ _] (swap! show-message not))}]
            [:text-view {:id ::hidden-message
                         :text "You found the hidden message!"
                         :text-size [16 :sp]
                         :text-color (unchecked-int 0xFF00CC00)
-                        :visibility :gone
+                        :visibility show-message*
                         :padding [16 4 0 4]}]
            ;; :progress on ProgressBar, :on-seek-bar-change on SeekBar
            [:text-view {:id ::seek-label
-                        :text "Progress: 50%"
+                        :text seek-text*
                         :text-size [16 :sp]
                         :padding [0 8 0 4]}]
-           [:seek-bar {:progress 50
+           [:seek-bar {:progress seek*
                        :max 100
                        :layout-width :fill
-                       :on-seek-bar-change on-seek-progress}]]]
+                       :on-seek-bar-change (fn [_b p _u] (reset! seek-progress p))}]]]
          ;; --- Tab 2: nREPL controls ---
          [:scroll-view {:id ::repl-tab
                         :layout-width :fill
