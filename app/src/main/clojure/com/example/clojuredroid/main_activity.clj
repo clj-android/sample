@@ -168,6 +168,8 @@
             (recur (+ waited 500))))
         (when @*root-view
           (nrepl-set-status! "Starting..." 0xFFCCCC00)
+          (when-not (repl-server/repl-available?)
+            (nrepl-set-status! "Unavailable" 0xFFFF0000))
           (nrepl-set-buttons! false false)
           (if (repl-server/wait-for-ready :timeout-ms 60000)
             (let [p (or (repl-server/port) 7888)]
