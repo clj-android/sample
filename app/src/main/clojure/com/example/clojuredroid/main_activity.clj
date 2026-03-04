@@ -302,7 +302,8 @@
                         :layout-weight 1
                         :visibility :gone}
           [:linear-layout {:orientation :vertical
-                           :padding [32 32 32 32]}
+                           :padding [32 32 32 32]
+                           :layout-width :match-parent}
            [:text-view {:text "nREPL Server"
                         :text-size [24 :sp]
                         :padding [0 0 0 8]}]
