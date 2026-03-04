@@ -17,12 +17,14 @@
   (:require [neko.ui :as ui]
             [neko.find-view :refer [find-view]]
             [neko.log :as log]
+            [neko.ui.support.material]
             [clj-android.repl.server :as repl-server])
   (:import android.app.Activity
            android.view.View
            android.widget.EditText
            android.widget.ProgressBar
            android.widget.TextView
+           [com.google.android.material.tabs TabLayout TabLayout$Tab]
            com.goodanser.clj_android.runtime.ClojureActivity))
 
 ;; Atom holding the current Activity instance. Set by make-ui
@@ -43,6 +45,15 @@
     [:text-view {:text "Clojure on Android"
                  :text-size [24 :sp]}]]))
 
+(defn- setup-tabs!
+  "Adds tab items to the TabLayout after the UI tree is built."
+  [root]
+  (when-let [^TabLayout tabs (find-view root ::tabs)]
+    (let [t1 (doto (.newTab tabs) (.setText "Widgets"))
+          t2 (doto (.newTab tabs) (.setText "REPL"))]
+      (.addTab tabs t1)
+      (.addTab tabs t2))))
+
 (defn make-ui
   "Builds the sample UI tree using neko's declarative DSL.
   Called by ClojureActivity.reloadUi() and by on-create.
@@ -51,6 +62,7 @@
   (reset! *activity activity)
   (let [root (ui/make-ui activity @*ui-tree)]
     (reset! *root-view root)
+    (setup-tabs! root)
     root))
 
 (defn on-create
@@ -72,6 +84,20 @@
 (add-watch *ui-tree :ui-reload-watch
            (fn [_key _ref _old _new]
              (reload-ui!)))
+
+;; --- Tab switching ---
+
+(defn- on-tab-selected [tab]
+  (when-let [root @*root-view]
+    (let [^View widgets (find-view root ::widgets-tab)
+          ^View repl-tab (find-view root ::repl-tab)]
+      (when (and widgets repl-tab)
+        (case (.getPosition ^TabLayout$Tab tab)
+          0 (do (.setVisibility widgets View/VISIBLE)
+                (.setVisibility repl-tab View/GONE))
+          1 (do (.setVisibility widgets View/GONE)
+                (.setVisibility repl-tab View/VISIBLE))
+          nil)))))
 
 ;; --- nREPL controls ---
 
@@ -203,86 +229,109 @@
 
 (reset! *ui-tree
         [:linear-layout {:id-holder true
-                         :orientation :vertical
-                         :padding [32 32 32 32]}
-         [:text-view {:text "Clojure on Android"
-                      :text-size [24 :sp]}]
-         [:text-view {:text "Built with neko UI DSL"
-                      :text-size [16 :sp]}]
-         [:text-view {:text (str "Counter: " @counter)
-                      :text-size [20 :sp]
-                      :padding default-padding
-                      :id ::counter-display}]
-         [:linear-layout {:orientation :horizontal}
-          [:button {:text "Increment"
-                    :on-click (fn [_]
-                                (let [v (swap! counter inc)]
+                         :orientation :vertical}
+         ;; Tab bar
+         [:tab-layout {:id ::tabs
+                       :tab-mode :fixed
+                       :tab-gravity :fill
+                       :layout-width :fill
+                       :on-tab-selected on-tab-selected}]
+         ;; --- Tab 1: Widget demos ---
+         [:scroll-view {:id ::widgets-tab
+                        :layout-width :fill
+                        :layout-height 0
+                        :layout-weight 1}
+          [:linear-layout {:orientation :vertical
+                           :padding [32 32 32 32]}
+           [:text-view {:text "Clojure on Android"
+                        :text-size [24 :sp]}]
+           [:text-view {:text "Built with neko UI DSL"
+                        :text-size [16 :sp]}]
+           [:text-view {:text (str "Counter: " @counter)
+                        :text-size [20 :sp]
+                        :padding default-padding
+                        :id ::counter-display}]
+           [:linear-layout {:orientation :horizontal}
+            [:button {:text "Increment"
+                      :on-click (fn [_]
+                                  (let [v (swap! counter inc)]
+                                    (.setText ^TextView (find-view @*root-view ::counter-display)
+                                              (str "Counter: " v))))}]
+            [:button {:text "Reset"
+                      :on-click (fn [_]
+                                  (reset! counter 0)
                                   (.setText ^TextView (find-view @*root-view ::counter-display)
-                                            (str "Counter: " v))))}]
-          [:button {:text "Reset"
-                    :on-click (fn [_]
-                                (reset! counter 0)
-                                (.setText ^TextView (find-view @*root-view ::counter-display)
-                                          "Counter: 0"))}]]
-         ;; :background-color and :gravity
-         [:text-view {:text "Centered with background"
-                      :text-size [16 :sp]
-                      :gravity :center
-                      :background-color (unchecked-int 0xFF334455)
-                      :text-color (unchecked-int 0xFFFFFFFF)
-                      :padding default-padding
-                      :layout-width :fill
-                      :content-description "Demo text with background color"}]
-         ;; :hint on EditText
-         [:edit-text {:hint "Type something here..."
-                      :padding default-padding}]
-         ;; :checked and :on-checked-change toggling :visibility
-         [:check-box {:text "Show hidden message"
-                      :checked false
-                      :text-size [16 :sp]
-                      :on-checked-change on-toggle-visibility}]
-         [:text-view {:id ::hidden-message
-                      :text "You found the hidden message!"
-                      :text-size [16 :sp]
-                      :text-color (unchecked-int 0xFF00CC00)
-                      :visibility :gone
-                      :padding [16 4 0 4]}]
-         ;; :progress on ProgressBar, :on-seek-bar-change on SeekBar
-         [:text-view {:id ::seek-label
-                      :text "Progress: 50%"
-                      :text-size [16 :sp]
-                      :padding [0 8 0 4]}]
-         [:seek-bar {:progress 50
-                     :max 100
-                     :layout-width :fill
-                     :on-seek-bar-change on-seek-progress}]
-         ;; --- nREPL section ---
-         [:text-view {:text "nREPL Server"
-                      :text-size [20 :sp]
-                      :padding [0 24 0 8]}]
-         [:linear-layout {:orientation :horizontal}
-          [:text-view {:text "Port: "
-                       :text-size [16 :sp]
-                       :padding [0 8 8 0]}]
-          [:edit-text {:id ::nrepl-port-input
-                       :text "7888"
-                       :input-type :number}]]
-         [:text-view {:id ::nrepl-status
-                      :text "Stopped"
-                      :text-size [16 :sp]
-                      :text-color (unchecked-int 0xFFAAAAAA)
-                      :padding [0 4 0 4]}]
-         [:linear-layout {:orientation :horizontal
-                          :padding [0 4 0 4]}
-          [:button {:id ::nrepl-start-btn
-                    :text "Start"
-                    :on-click on-start-nrepl}]
-          [:button {:id ::nrepl-stop-btn
-                    :text "Stop"
-                    :enabled false
-                    :on-click on-stop-nrepl}]]
-         [:text-view {:id ::nrepl-error
-                      :text ""
-                      :text-size [14 :sp]
-                      :text-color (unchecked-int 0xFFFF0000)
-                      :padding [0 4 0 0]}]])
+                                            "Counter: 0"))}]]
+           ;; :background-color and :gravity
+           [:text-view {:text "Centered with background"
+                        :text-size [16 :sp]
+                        :gravity :center
+                        :background-color (unchecked-int 0xFF334455)
+                        :text-color (unchecked-int 0xFFFFFFFF)
+                        :padding default-padding
+                        :layout-width :fill
+                        :content-description "Demo text with background color"}]
+           ;; :hint on EditText
+           [:edit-text {:hint "Type something here..."
+                        :padding default-padding}]
+           ;; :checked and :on-checked-change toggling :visibility
+           [:check-box {:text "Show hidden message"
+                        :checked false
+                        :text-size [16 :sp]
+                        :on-checked-change on-toggle-visibility}]
+           [:text-view {:id ::hidden-message
+                        :text "You found the hidden message!"
+                        :text-size [16 :sp]
+                        :text-color (unchecked-int 0xFF00CC00)
+                        :visibility :gone
+                        :padding [16 4 0 4]}]
+           ;; :progress on ProgressBar, :on-seek-bar-change on SeekBar
+           [:text-view {:id ::seek-label
+                        :text "Progress: 50%"
+                        :text-size [16 :sp]
+                        :padding [0 8 0 4]}]
+           [:seek-bar {:progress 50
+                       :max 100
+                       :layout-width :fill
+                       :on-seek-bar-change on-seek-progress}]]]
+         ;; --- Tab 2: nREPL controls ---
+         [:scroll-view {:id ::repl-tab
+                        :layout-width :fill
+                        :layout-height 0
+                        :layout-weight 1
+                        :visibility :gone}
+          [:linear-layout {:orientation :vertical
+                           :padding [32 32 32 32]}
+           [:text-view {:text "nREPL Server"
+                        :text-size [24 :sp]
+                        :padding [0 0 0 8]}]
+           [:text-view {:text "Connect from your editor to live-reload code."
+                        :text-size [14 :sp]
+                        :text-color (unchecked-int 0xFF888888)
+                        :padding [0 0 0 16]}]
+           [:linear-layout {:orientation :horizontal}
+            [:text-view {:text "Port: "
+                         :text-size [16 :sp]
+                         :padding [0 8 8 0]}]
+            [:edit-text {:id ::nrepl-port-input
+                         :text "7888"
+                         :input-type :number}]]
+           [:text-view {:id ::nrepl-status
+                        :text "Stopped"
+                        :text-size [16 :sp]
+                        :text-color (unchecked-int 0xFFAAAAAA)
+                        :padding [0 4 0 4]}]
+           [:linear-layout {:orientation :horizontal
+                            :padding [0 4 0 4]}
+            [:button {:id ::nrepl-start-btn
+                      :text "Start"
+                      :on-click on-start-nrepl}]
+            [:button {:id ::nrepl-stop-btn
+                      :text "Stop"
+                      :enabled false
+                      :on-click on-stop-nrepl}]]
+           [:text-view {:id ::nrepl-error
+                        :text ""
+                        :text-size [14 :sp]
+                        :text-color (unchecked-int 0xFFFF0000)
+                        :padding [0 4 0 0]}]]]])
