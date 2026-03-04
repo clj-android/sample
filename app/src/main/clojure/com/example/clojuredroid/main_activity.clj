@@ -17,6 +17,7 @@
   (:require [neko.ui :as ui]
             [neko.find-view :refer [find-view]]
             [neko.log :as log]
+            [neko.reactive :refer [cell cell=]]
             [neko.ui.support.material]
             [clj-android.repl.server :as repl-server])
   (:import android.app.Activity
@@ -35,7 +36,8 @@
 ;; Button click handlers use this with find-view to locate child views.
 (defonce *root-view (atom nil))
 
-(def ^:private counter (atom 0))
+(def ^:private counter (cell 0))
+(def ^:private counter-text (cell= #(str "Counter: " @counter)))
 
 ;;  Update this atom from the REPL to change the UI layout.
 (defonce *ui-tree
@@ -248,21 +250,14 @@
                         :text-size [24 :sp]}]
            [:text-view {:text "Built with neko UI DSL"
                         :text-size [16 :sp]}]
-           [:text-view {:text (str "Counter: " @counter)
+           [:text-view {:text counter-text
                         :text-size [20 :sp]
-                        :padding default-padding
-                        :id ::counter-display}]
+                        :padding default-padding}]
            [:linear-layout {:orientation :horizontal}
             [:button {:text "Increment"
-                      :on-click (fn [_]
-                                  (let [v (swap! counter inc)]
-                                    (.setText ^TextView (find-view @*root-view ::counter-display)
-                                              (str "Counter: " v))))}]
+                      :on-click (fn [_] (swap! counter inc))}]
             [:button {:text "Reset"
-                      :on-click (fn [_]
-                                  (reset! counter 0)
-                                  (.setText ^TextView (find-view @*root-view ::counter-display)
-                                            "Counter: 0"))}]]
+                      :on-click (fn [_] (reset! counter 0))}]]
            ;; :background-color and :gravity
            [:text-view {:text "Centered with background"
                         :text-size [16 :sp]
