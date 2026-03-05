@@ -19,7 +19,8 @@
             [neko.log :as log]
             [neko.reactive :refer [cell cell=]]
             [neko.ui.support.material]
-            [clj-android.repl.server :as repl-server])
+            [clj-android.repl.server :as repl-server]
+            [neko.doc :refer [describe]])
   (:import android.app.Activity
            android.view.View
            android.widget.EditText
@@ -221,15 +222,15 @@
 ;; cell is like an atom, cell= takes a function of zero arguments that references cells.
 ;; Use the cell= as the value of a trait or attribute and the UI will track its value.
 
-(def ^:private counter (cell 0))
-(def ^:private counter-text* (cell= #(str "Counter: " @counter)))
+(def counter (cell 0))
+(def counter-text= (cell= #(str "Counter: " @counter)))
 
 (def seek-progress (cell 50))
-(def seek-text* (cell= #(str "Progress: " @seek-progress "%")))
-(def seek* (cell= #(deref seek-progress)))
+(def seek-text= (cell= #(str "Progress: " @seek-progress "%")))
+(def seek= (cell= #(deref seek-progress)))
 
 (def show-message (cell false))
-(def show-message* (cell= #(if @show-message :visible :gone)))
+(def show-message= (cell= #(if @show-message :visible :gone)))
 
 (reset! *ui-tree
         [:linear-layout {:id-holder true
@@ -280,14 +281,14 @@
                         :text "You found the hidden message!"
                         :text-size [16 :sp]
                         :text-color (unchecked-int 0xFF00CC00)
-                        :visibility show-message*
+                        :visibility show-message=
                         :padding [16 4 0 4]}]
            ;; :progress on ProgressBar, :on-seek-bar-change on SeekBar
            [:text-view {:id ::seek-label
-                        :text seek-text*
+                        :text seek-text=
                         :text-size [16 :sp]
                         :padding [0 8 0 4]}]
-           [:seek-bar {:progress seek*
+           [:seek-bar {:progress seek=
                        :max 100
                        :layout-width :fill
                        :on-seek-bar-change (fn [_b p _u] (reset! seek-progress p))}]]]
