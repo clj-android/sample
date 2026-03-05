@@ -24,7 +24,6 @@
   (:import android.app.Activity
            android.view.View
            android.widget.EditText
-           android.widget.ProgressBar
            android.widget.TextView
            [com.google.android.material.tabs TabLayout TabLayout$Tab]
            com.goodanser.clj_android.runtime.ClojureActivity))
