@@ -222,8 +222,8 @@
            [:text-view {:text "Clojure on Android"
                         :text-size [24 :sp]
                         :gravity :center
-                        :background-color (unchecked-int 0xFF334455)
-                        :text-color (unchecked-int 0xFFFFFFFF)
+                        :background-color 0xFF334455
+                        :text-color 0xFFFFFFFF
                         :padding [24 12 12 12]
                         :layout-width :fill
                         :content-description "Demo text with background color"}]
@@ -246,7 +246,7 @@
            [:text-view {:id ::hidden-message
                         :text "You found the hidden message!"
                         :text-size [16 :sp]
-                        :text-color (unchecked-int 0xFF00CC00)
+                        :text-color 0xFF00CC00
                         :visibility show-message=
                         :padding [16 4 0 4]}]
            ;; :progress on ProgressBar, :on-seek-bar-change on SeekBar
@@ -271,7 +271,7 @@
                         :padding [0 0 0 8]}]
            [:text-view {:text "Connect from your editor to live-reload code."
                         :text-size [14 :sp]
-                        :text-color (unchecked-int 0xFF888888)
+                        :text-color 0xFF888888
                         :padding [0 0 0 16]}]
            [:linear-layout {:orientation :horizontal}
             [:text-view {:text "Port: "
@@ -283,7 +283,7 @@
            [:text-view {:id ::nrepl-status
                         :text "Stopped"
                         :text-size [16 :sp]
-                        :text-color (unchecked-int 0xFFAAAAAA)
+                        :text-color 0xFFAAAAAA
                         :padding [0 4 0 4]}]
            [:linear-layout {:orientation :horizontal
                             :padding [0 4 0 4]}
@@ -297,5 +297,5 @@
            [:text-view {:id ::nrepl-error
                         :text ""
                         :text-size [14 :sp]
-                        :text-color (unchecked-int 0xFFFF0000)
+                        :text-color 0xFFFF0000
                         :padding [0 4 0 0]}]]]])
