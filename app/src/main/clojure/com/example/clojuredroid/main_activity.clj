@@ -76,8 +76,9 @@
    [:linear-layout {:orientation :vertical
                     :layout-width :fill
                     :layout-height :fill}
-    ;; Header bar
-    [:linear-layout {:orientation :horizontal
+    ;; Header bar — top padding set in on-create to account for status bar
+    [:linear-layout {:id ::header
+                     :orientation :horizontal
                      :background-color 0xFF6200EE
                      :padding [4 8 16 8]
                      :layout-width :fill
@@ -130,12 +131,27 @@
     (reset! *root-view root)
     root))
 
+(defn- status-bar-height
+  "Returns the status bar height in pixels."
+  [^Activity activity]
+  (let [res (.getResources activity)
+        id  (.getIdentifier res "status_bar_height" "dimen" "android")]
+    (if (pos? id) (.getDimensionPixelSize res id) 0)))
+
 (defn on-create
   "Called automatically by ClojureActivity when the activity is created."
   [^Activity activity saved-instance-state]
   (let [^View root (make-ui activity)]
-    (.setFitsSystemWindows root true)
     (.setContentView activity ^View root)
+    ;; Match status bar color to header and add inset padding
+    (.. activity getWindow (setStatusBarColor (unchecked-int 0xFF6200EE)))
+    (let [sb-height (status-bar-height activity)]
+      (when-let [^View header (find-view root ::header)]
+        (.setPadding header
+                     (.getPaddingLeft header)
+                     (+ (.getPaddingTop header) sb-height)
+                     (.getPaddingRight header)
+                     (.getPaddingBottom header))))
     ;; Initialize sub-namespaces
     (repl-ui/init! activity root)
     (widgets/init! root activity)
