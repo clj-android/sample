@@ -41,10 +41,10 @@
 (defn- set-buttons! [start-enabled? stop-enabled?]
   (run-on-ui!
     (fn []
-      (some-> (find-view @*root-view ::nrepl-start-btn)
-              (.setEnabled (boolean start-enabled?)))
-      (some-> (find-view @*root-view ::nrepl-stop-btn)
-              (.setEnabled (boolean stop-enabled?))))))
+      (when-let [^android.view.View v (find-view @*root-view ::nrepl-start-btn)]
+        (.setEnabled v (boolean start-enabled?)))
+      (when-let [^android.view.View v (find-view @*root-view ::nrepl-stop-btn)]
+        (.setEnabled v (boolean stop-enabled?))))))
 
 (defn- parse-port [^EditText et]
   (try

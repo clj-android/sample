@@ -37,7 +37,7 @@
                  :text-color 0xFF666666
                  :padding [0 4 0 4]}]
     [:button {:text "Simple Dialog"
-              :on-click (fn [v]
+              :on-click (fn [^View v]
                           (dialog/alert (.getContext v)
                             {:title "Hello"
                              :message "This is a simple AlertDialog built with neko.dialog/alert."
@@ -46,7 +46,7 @@
                              :negative-button ["Cancel" (fn [_ _]
                                                           (reset! dialog-result "Cancel pressed"))]}))}]
     [:button {:text "List Dialog"
-              :on-click (fn [v]
+              :on-click (fn [^View v]
                           (let [fruits ["Apple" "Banana" "Cherry" "Date"]]
                             (dialog/alert (.getContext v)
                               {:title "Pick a fruit"
@@ -54,9 +54,9 @@
                                :on-item-click (fn [d pos]
                                                 (reset! dialog-result
                                                         (str "Picked: " (nth fruits pos)))
-                                                (.dismiss d))})))}]
+                                                (.dismiss ^DialogInterface d))})))}]
     [:button {:text "Cancelable Dialog"
-              :on-click (fn [v]
+              :on-click (fn [^View v]
                           (dialog/alert (.getContext v)
                             {:title "Can you dismiss me?"
                              :message "Tap outside or press back to cancel."

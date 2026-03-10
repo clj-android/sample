@@ -134,9 +134,9 @@
 (defn on-create
   "Called automatically by ClojureActivity when the activity is created."
   [^Activity activity saved-instance-state]
-  (let [root (make-ui activity)]
+  (let [^View root (make-ui activity)]
     (.setFitsSystemWindows root true)
-    (.setContentView activity root)
+    (.setContentView activity ^View root)
     ;; Initialize repl namespace with references
     (repl-ui/init! activity root)
     ;; Show default section
