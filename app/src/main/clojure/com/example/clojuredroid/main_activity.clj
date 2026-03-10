@@ -137,8 +137,9 @@
   (let [^View root (make-ui activity)]
     (.setFitsSystemWindows root true)
     (.setContentView activity ^View root)
-    ;; Initialize repl namespace with references
+    ;; Initialize sub-namespaces
     (repl-ui/init! activity root)
+    (widgets/init! root activity)
     ;; Show default section
     (show-section! ::widgets)))
 

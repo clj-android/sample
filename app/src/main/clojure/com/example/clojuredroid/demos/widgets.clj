@@ -1,7 +1,10 @@
 (ns com.example.clojuredroid.demos.widgets
   "Basic widget demos: counter, checkbox, seek-bar, switch, toggle-button,
-  radio-group, and horizontal-scroll-view."
-  (:require [neko.reactive :refer [cell cell=]]))
+  radio-group, spinner, image-view, and horizontal-scroll-view."
+  (:require [neko.reactive :refer [cell cell=]]
+            [neko.find-view :refer [find-view]])
+  (:import android.widget.ArrayAdapter
+           android.widget.Spinner))
 
 (def counter (cell 0))
 (def seek-progress (cell 50))
@@ -10,6 +13,17 @@
 (def switch-state (cell false))
 (def toggle-state (cell false))
 (def selected-radio (cell "None"))
+(def spinner-items ["Red" "Green" "Blue" "Yellow" "Purple"])
+(def spinner-selection (cell (first spinner-items)))
+
+(defn init!
+  "Called after make-ui to set up the Spinner adapter."
+  [root-view ^android.content.Context context]
+  (when-let [^Spinner spinner (find-view root-view ::spinner)]
+    (let [adapter (ArrayAdapter. context
+                    android.R$layout/simple_spinner_dropdown_item
+                    ^java.util.List (java.util.ArrayList. ^java.util.Collection spinner-items))]
+      (.setAdapter spinner adapter))))
 
 (defn section-ui
   "Returns the Widgets demo section UI tree.
@@ -97,6 +111,28 @@
                      :on-checked-change (fn [_ c] (when c (reset! selected-radio "C")))}]]
     [:text-view {:text (cell= #(str "Selected: " @selected-radio))
                  :padding [0 2 0 0]}]
+
+    ;; ImageView
+    [:text-view {:text "ImageView"
+                 :text-size [16 :sp]
+                 :text-color 0xFF666666
+                 :padding [0 16 0 4]}]
+    [:image-view {:image-resource android.R$drawable/ic_dialog_info
+                  :padding [0 4 0 0]}]
+
+    ;; Spinner
+    [:text-view {:text "Spinner"
+                 :text-size [16 :sp]
+                 :text-color 0xFF666666
+                 :padding [0 16 0 4]}]
+    [:text-view {:text (cell= #(str "Selected: " @spinner-selection))
+                 :text-size [14 :sp]
+                 :text-color 0xFF999999
+                 :padding [0 2 0 4]}]
+    [:spinner {:id ::spinner
+               :on-item-selected (fn [_ _ pos _]
+                                   (reset! spinner-selection
+                                           (nth spinner-items pos)))}]
 
     ;; HorizontalScrollView
     [:text-view {:text "HorizontalScrollView"
