@@ -1,301 +1,155 @@
 (ns com.example.clojuredroid.main-activity
-  "Neko UI DSL demo. Constructs a declarative UI and provides
-  functions for REPL-driven hot-reload.
+  "Neko UI DSL demo app with DrawerLayout navigation.
 
   This namespace is automatically loaded by ClojureActivity when
   com.example.clojuredroid.MainActivity is created.
 
+  The app demonstrates neko features across multiple demo sections,
+  accessible via a navigation drawer.
+
   To modify the UI live from the REPL:
 
     (require '[com.example.clojuredroid.main-activity :as ui])
-    (reset! ui/*ui-tree
-      [:linear-layout {:id-holder true
-                       :orientation :vertical
-                       :padding [32 32 32 32]}
-       [:button {:text \"New button!\"}]])
     (ui/reload-ui!)"
   (:require [neko.ui :as ui]
             [neko.find-view :refer [find-view]]
-            [neko.log :as log]
-            [neko.reactive :refer [cell cell=]]
+            [neko.ui.support.drawer-layout]
             [neko.ui.support.material]
-            [clj-android.repl.server :as repl-server]
-            [neko.doc :refer [describe]])
+            [com.example.clojuredroid.demos.widgets :as widgets]
+            [com.example.clojuredroid.demos.lists :as lists]
+            [com.example.clojuredroid.demos.material :as material]
+            [com.example.clojuredroid.demos.forms :as forms]
+            [com.example.clojuredroid.demos.dialogs :as dialogs]
+            [com.example.clojuredroid.repl :as repl-ui])
   (:import android.app.Activity
-           android.widget.EditText
-           android.widget.TextView
+           android.view.View
+           [androidx.drawerlayout.widget DrawerLayout]
            com.goodanser.clj_android.runtime.ClojureActivity))
 
-;; Atom holding the current Activity instance. Set by make-ui
-;; so that REPL callers can reload the UI without passing it explicitly.
 (defonce *activity (atom nil))
-
-;; Root view returned by make-ui (the id-holder linear-layout).
-;; Button click handlers use this with find-view to locate child views.
 (defonce *root-view (atom nil))
 
-;;  Update this atom from the REPL to change the UI layout.
-(defonce *ui-tree
-  (atom [:linear-layout {:id-holder true
-                    :orientation :vertical
-                    :padding [32 32 32 32]}
-    [:text-view {:text "Clojure on Android"
-                 :text-size [24 :sp]}]]))
+;; Section definitions: [keyword label namespace-section-fn]
+(def ^:private sections
+  [[::widgets  "Widgets"             widgets/section-ui]
+   [::lists    "Lists & Adapters"    lists/section-ui]
+   [::material "Material Components" material/section-ui]
+   [::forms    "Forms & Input"       forms/section-ui]
+   [::dialogs  "Dialogs & Toasts"    dialogs/section-ui]
+   [::repl     "nREPL"               repl-ui/section-ui]])
+
+(def ^:private section-ids (mapv first sections))
+
+(defn- show-section!
+  "Shows the section with the given ID, hides all others, closes the drawer."
+  [section-id]
+  (when-let [root @*root-view]
+    (doseq [id section-ids]
+      (when-let [^View v (find-view root id)]
+        (.setVisibility v (if (= id section-id) View/VISIBLE View/GONE))))
+    ;; Update header title
+    (when-let [^android.widget.TextView title-view (find-view root ::header-title)]
+      (let [label (some (fn [[id label _]] (when (= id section-id) label)) sections)]
+        (when label (.setText title-view ^CharSequence (str label)))))
+    ;; Close drawer
+    (when-let [^DrawerLayout dl (find-view root ::drawer)]
+      (.closeDrawers dl))))
+
+(defn- nav-item
+  "Returns a UI tree for a single navigation drawer item."
+  [[section-id label _]]
+  [:text-view {:text label
+               :text-size [16 :sp]
+               :padding [24 14 24 14]
+               :on-click (fn [_] (show-section! section-id))}])
+
+(defn- open-drawer! [_view]
+  (when-let [root @*root-view]
+    (when-let [^DrawerLayout dl (find-view root ::drawer)]
+      (.openDrawer dl (int android.view.Gravity/START)))))
+
+(defn- build-ui-tree []
+  [:drawer-layout {:id ::drawer
+                   :id-holder true
+                   :layout-width :fill
+                   :layout-height :fill}
+   ;; === Content (first child) ===
+   [:linear-layout {:orientation :vertical
+                    :layout-width :fill
+                    :layout-height :fill}
+    ;; Header bar
+    [:linear-layout {:orientation :horizontal
+                     :background-color 0xFF6200EE
+                     :padding [4 8 16 8]
+                     :layout-width :fill
+                     :gravity :center-vertical}
+     [:button {:text "\u2630"
+               :text-size [22 :sp]
+               :text-color 0xFFFFFFFF
+               :background-color 0xFF6200EE
+               :min-width [48 :dp]
+               :on-click open-drawer!}]
+     [:text-view {:id ::header-title
+                  :text "Widgets"
+                  :text-size [20 :sp]
+                  :text-color 0xFFFFFFFF
+                  :padding [4 0 0 0]}]]
+    ;; Section container
+    [:frame-layout {:layout-width :fill
+                    :layout-height 0
+                    :layout-weight 1}
+     (widgets/section-ui ::widgets)
+     (lists/section-ui ::lists)
+     (material/section-ui ::material)
+     (forms/section-ui ::forms)
+     (dialogs/section-ui ::dialogs)
+     (repl-ui/section-ui ::repl)]]
+   ;; === Drawer (second child, layout-gravity :start) ===
+   [:scroll-view {:layout-width [280 :dp]
+                  :layout-height :fill
+                  :layout-gravity :start
+                  :background-color 0xFFFAFAFA}
+    (into [:linear-layout {:orientation :vertical
+                           :padding [0 24 0 0]}
+           [:text-view {:text "Neko Demos"
+                        :text-size [22 :sp]
+                        :text-color 0xFF333333
+                        :padding [24 16 24 20]}]
+           [:view {:background-color 0xFFDDDDDD
+                   :layout-width :fill
+                   :layout-height [1 :dp]}]]
+          (map nav-item sections))]])
+
+(defonce *ui-tree (atom nil))
 
 (defn make-ui
-  "Builds the sample UI tree using neko's declarative DSL.
-  Called by ClojureActivity.reloadUi() and by on-create.
-  Reads the UI tree from *ui-tree if set, otherwise uses the default."
+  "Builds the UI tree using neko's declarative DSL."
   [^Activity activity]
   (reset! *activity activity)
-  (let [root (ui/make-ui activity @*ui-tree)]
+  (let [tree (or @*ui-tree (build-ui-tree))
+        root (ui/make-ui activity tree)]
     (reset! *root-view root)
     root))
 
 (defn on-create
-  "Called automatically by ClojureActivity when the activity is created.
-  Sets up the initial UI."
+  "Called automatically by ClojureActivity when the activity is created."
   [^Activity activity saved-instance-state]
-  (let [view (make-ui activity)]
-    (.setFitsSystemWindows view true)
-    (.setContentView activity view)))
+  (let [root (make-ui activity)]
+    (.setFitsSystemWindows root true)
+    (.setContentView activity root)
+    ;; Initialize repl namespace with references
+    (repl-ui/init! activity root)
+    ;; Show default section
+    (show-section! ::widgets)))
 
 (defn reload-ui!
-  "Hot-reload the UI from the REPL. Uses ClojureActivity's
-  built-in reloadUi mechanism."
+  "Hot-reload the UI from the REPL."
   []
   (when-let [activity (ClojureActivity/getInstance
                         "com.example.clojuredroid.main-activity")]
     (.reloadUi ^ClojureActivity activity)))
 
-(add-watch *ui-tree :ui-reload-watch
-           (fn [_key _ref _old _new]
-             (reload-ui!)))
-
-;; --- nREPL controls ---
-;; These update values in the UI the old fashioned way
-
-(defn- run-on-ui! [f]
-  (when-let [^Activity activity @*activity]
-    (.runOnUiThread activity f)))
-
-(defn- nrepl-set-status! [text color]
-  (run-on-ui!
-    (fn []
-      (when-let [^TextView v (find-view @*root-view ::nrepl-status)]
-        (.setText v (str text))
-        (.setTextColor v (unchecked-int color))))))
-
-(defn- nrepl-set-error! [text]
-  (run-on-ui!
-    (fn []
-      (when-let [^TextView v (find-view @*root-view ::nrepl-error)]
-        (.setText v (str text))))))
-
-(defn- nrepl-set-buttons! [start-enabled? stop-enabled?]
-  (run-on-ui!
-    (fn []
-      (some-> (find-view @*root-view ::nrepl-start-btn)
-              (.setEnabled (boolean start-enabled?)))
-      (some-> (find-view @*root-view ::nrepl-stop-btn)
-              (.setEnabled (boolean stop-enabled?))))))
-
-(defn- parse-port [^EditText et]
-  (try
-    (let [p (Integer/parseInt (.. et getText toString trim))]
-      (when (<= 1 p 65535) p))
-    (catch NumberFormatException _ nil)))
-
-(defn- on-start-nrepl [_view]
-  (when-let [root @*root-view]
-    (let [port (some-> (find-view root ::nrepl-port-input)
-                       (parse-port))]
-      (if-not port
-        (nrepl-set-error! "Invalid port (1\u201365535)")
-        (do
-          (nrepl-set-error! "")
-          (nrepl-set-status! "Starting..." 0xFFCCCC00)
-          (nrepl-set-buttons! false false)
-          (.start
-            (Thread.
-              (.getThreadGroup (Thread/currentThread))
-              (fn []
-                (try
-                  (if (repl-server/running?)
-                    (nrepl-set-status! (str "Running on port "
-                                            (or (repl-server/port) port))
-                                       0xFF00CC00)
-                    (repl-server/start port))
-                  (nrepl-set-status! (str "Running on port "
-                                          (or (repl-server/port) port))
-                                     0xFF00CC00)
-                  (nrepl-set-buttons! false true)
-                  (catch Throwable t
-                    (nrepl-set-status! "Error" 0xFFFF0000)
-                    (nrepl-set-error! (.getMessage t))
-                    (nrepl-set-buttons! true false))))
-              "nrepl-start"
-              1048576)))))))
-
-(defn- on-stop-nrepl [_view]
-  (nrepl-set-status! "Stopping..." 0xFFCCCC00)
-  (nrepl-set-buttons! false false)
-  (.start
-    (Thread.
-      (fn []
-        (try
-          (repl-server/stop)
-          (nrepl-set-status! "Stopped" 0xFFAAAAAA)
-          (nrepl-set-error! "")
-          (nrepl-set-buttons! true false)
-          (catch Throwable t
-            (nrepl-set-status! "Error" 0xFFFF0000)
-            (nrepl-set-error! (.getMessage t))
-            (nrepl-set-buttons! false true))))
-      "nrepl-stop")))
-
-(defn- sync-nrepl-status!
-  "Waits for nREPL auto-start completion and updates the UI.
-  Shows 'Starting...' while loading, then 'Running' once ready."
-  []
-  (.start
-    (Thread.
-      (fn []
-        ;; Wait for UI to be ready before showing status
-        (loop [waited 0]
-          (when (and (nil? @*root-view) (< waited 10000))
-            (Thread/sleep 500)
-            (recur (+ waited 500))))
-        (when @*root-view
-          (nrepl-set-status! "Starting..." 0xFFCCCC00)
-          (when-not (repl-server/repl-available?)
-            (nrepl-set-status! "Unavailable" 0xFFFF0000))
-          (nrepl-set-buttons! false false)
-          (if (repl-server/wait-for-ready :timeout-ms 60000)
-            (let [p (or (repl-server/port) 7888)]
-              (nrepl-set-status! (str "Running on port " p) 0xFF00CC00)
-              (nrepl-set-buttons! false true))
-            ;; Timeout — server didn't start
-            (when-not (repl-server/running?)
-              (nrepl-set-status! "Stopped" 0xFFAAAAAA)
-              (nrepl-set-buttons! true false)))))
-      "nrepl-status-sync")))
-
-;; Detect nREPL auto-started by ClojureApp and sync the UI status.
-
+;; Sync nREPL status when UI reloads
 (add-watch *ui-tree :nrepl-status-watch
            (fn [_key _ref _old _new]
-             (sync-nrepl-status!)))
-
-(def default-padding [12 12 12 12])
-
-
-;; Here, we use neko.reactive cells. Changing the value of a cell updates the UI.
-;; This is experimental, but it should make UI programming much nicer.
-;; cell is like an atom, cell= takes a function of zero arguments that references cells.
-;; Use the cell= as the value of a trait or attribute and the UI will track its value.
-
-(def counter (cell 0))
-(def seek-progress (cell 50))
-(def show-message (cell false))
-;; Suggested convention: = suffix for named formulas
-(def show-message= (cell= #(if @show-message :visible :gone)))
-
-(reset! *ui-tree
-        [:linear-layout {:id-holder true
-                         :orientation :vertical}
-         ;; Tab bar
-         [:tab-layout {:id ::tabs
-                       :tab-mode :fixed
-                       :tab-gravity :fill
-                       :layout-width :fill
-                       :tab-content ["Widgets" ::widgets-tab
-                                     "REPL"    ::repl-tab]}]
-         ;; --- Tab 1: Widget demos ---
-         [:scroll-view {:id ::widgets-tab
-                        :layout-width :fill
-                        :layout-height 0
-                        :layout-weight 1}
-          [:linear-layout {:orientation :vertical
-                           :padding [32 32 32 32]
-                           :layout-width :match-parent}
-           [:text-view {:text "Clojure on Android"
-                        :text-size [24 :sp]
-                        :gravity :center
-                        :background-color 0xFF334455
-                        :text-color 0xFFFFFFFF
-                        :padding [24 12 12 12]
-                        :layout-width :fill
-                        :content-description "Demo text with background color"}]
-           [:text-view {:text "Built with neko UI DSL"
-                        :text-size [16 :sp]}]
-           [:text-view {:text (cell= #(str "Counter: " @counter))}]
-           [:linear-layout {:orientation :horizontal}
-            [:button {:text "Increment"
-                      :on-click (fn [_] (swap! counter inc))}]
-            [:button {:text "Reset"
-                      :on-click (fn [_] (reset! counter 0))}]]
-           ;; :hint on EditText
-           [:edit-text {:hint "Type something here..."
-                        :padding default-padding}]
-           ;; :checked and :on-checked-change toggling :visibility
-           [:check-box {:text "Show hidden message"
-                        :checked false
-                        :text-size [16 :sp]
-                        :on-checked-change (fn [_ _] (swap! show-message not))}]
-           [:text-view {:id ::hidden-message
-                        :text "You found the hidden message!"
-                        :text-size [16 :sp]
-                        :text-color 0xFF00CC00
-                        :visibility show-message=
-                        :padding [16 4 0 4]}]
-           ;; :progress on ProgressBar, :on-seek-bar-change on SeekBar
-           [:text-view {:id ::seek-label
-                        :text (cell= #(str "Progress: " @seek-progress "%"))
-                        :text-size [16 :sp]
-                        :padding [0 8 0 4]}]
-           [:seek-bar {:progress (cell= #(deref seek-progress))
-                       :max 100
-                       :layout-width :fill
-                       :on-seek-bar-change (fn [_b p _u] (reset! seek-progress p))}]]]
-         ;; --- Tab 2: nREPL controls ---
-         [:scroll-view {:id ::repl-tab
-                        :layout-width :fill
-                        :layout-height 0
-                        :layout-weight 1}
-          [:linear-layout {:orientation :vertical
-                           :padding [32 32 32 32]
-                           :layout-width :match-parent}
-           [:text-view {:text "nREPL Server"
-                        :text-size [24 :sp]
-                        :padding [0 0 0 8]}]
-           [:text-view {:text "Connect from your editor to live-reload code."
-                        :text-size [14 :sp]
-                        :text-color 0xFF888888
-                        :padding [0 0 0 16]}]
-           [:linear-layout {:orientation :horizontal}
-            [:text-view {:text "Port: "
-                         :text-size [16 :sp]
-                         :padding [0 8 8 0]}]
-            [:edit-text {:id ::nrepl-port-input
-                         :text "7888"
-                         :input-type :number}]]
-           [:text-view {:id ::nrepl-status
-                        :text "Stopped"
-                        :text-size [16 :sp]
-                        :text-color 0xFFAAAAAA
-                        :padding [0 4 0 4]}]
-           [:linear-layout {:orientation :horizontal
-                            :padding [0 4 0 4]}
-            [:button {:id ::nrepl-start-btn
-                      :text "Start"
-                      :on-click on-start-nrepl}]
-            [:button {:id ::nrepl-stop-btn
-                      :text "Stop"
-                      :enabled false
-                      :on-click on-stop-nrepl}]]
-           [:text-view {:id ::nrepl-error
-                        :text ""
-                        :text-size [14 :sp]
-                        :text-color 0xFFFF0000
-                        :padding [0 4 0 0]}]]]])
+             (repl-ui/sync-status!)))
