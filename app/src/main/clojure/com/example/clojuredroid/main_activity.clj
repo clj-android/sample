@@ -222,13 +222,9 @@
 ;; Use the cell= as the value of a trait or attribute and the UI will track its value.
 
 (def counter (cell 0))
-(def counter-text= (cell= #(str "Counter: " @counter)))
-
 (def seek-progress (cell 50))
-(def seek-text= (cell= #(str "Progress: " @seek-progress "%")))
-(def seek= (cell= #(deref seek-progress)))
-
 (def show-message (cell false))
+;; Suggested convention: = suffix for named formulas
 (def show-message= (cell= #(if @show-message :visible :gone)))
 
 (reset! *ui-tree
@@ -258,7 +254,7 @@
                         :content-description "Demo text with background color"}]
            [:text-view {:text "Built with neko UI DSL"
                         :text-size [16 :sp]}]
-           [:text-view {:text counter-text
+           [:text-view {:text (cell= #(str "Counter: " @counter))
                         :text-size [20 :sp]
                         :padding default-padding}]
            [:linear-layout {:orientation :horizontal}
@@ -266,8 +262,6 @@
                       :on-click (fn [_] (swap! counter inc))}]
             [:button {:text "Reset"
                       :on-click (fn [_] (reset! counter 0))}]]
-           ;; :background-color and :gravity
-           
            ;; :hint on EditText
            [:edit-text {:hint "Type something here..."
                         :padding default-padding}]
@@ -284,10 +278,10 @@
                         :padding [16 4 0 4]}]
            ;; :progress on ProgressBar, :on-seek-bar-change on SeekBar
            [:text-view {:id ::seek-label
-                        :text seek-text=
+                        :text (cell= #(str "Progress: " @seek-progress "%"))
                         :text-size [16 :sp]
                         :padding [0 8 0 4]}]
-           [:seek-bar {:progress seek=
+           [:seek-bar {:progress (cell= #(deref seek-progress))
                        :max 100
                        :layout-width :fill
                        :on-seek-bar-change (fn [_b p _u] (reset! seek-progress p))}]]]
