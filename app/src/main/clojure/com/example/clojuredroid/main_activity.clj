@@ -25,7 +25,7 @@
            android.view.View
            android.widget.EditText
            android.widget.TextView
-           [com.google.android.material.tabs TabLayout TabLayout$Tab]
+           [com.google.android.material.tabs TabLayout$Tab]
            com.goodanser.clj_android.runtime.ClojureActivity))
 
 ;; Atom holding the current Activity instance. Set by make-ui
@@ -44,15 +44,6 @@
     [:text-view {:text "Clojure on Android"
                  :text-size [24 :sp]}]]))
 
-(defn- setup-tabs!
-  "Adds tab items to the TabLayout after the UI tree is built."
-  [root]
-  (when-let [^TabLayout tabs (find-view root ::tabs)]
-    (let [t1 (doto (.newTab tabs) (.setText "Widgets"))
-          t2 (doto (.newTab tabs) (.setText "REPL"))]
-      (.addTab tabs t1)
-      (.addTab tabs t2))))
-
 (defn make-ui
   "Builds the sample UI tree using neko's declarative DSL.
   Called by ClojureActivity.reloadUi() and by on-create.
@@ -61,7 +52,6 @@
   (reset! *activity activity)
   (let [root (ui/make-ui activity @*ui-tree)]
     (reset! *root-view root)
-    (setup-tabs! root)
     root))
 
 (defn on-create
@@ -239,7 +229,8 @@
                        :tab-mode :fixed
                        :tab-gravity :fill
                        :layout-width :fill
-                       :on-tab-selected on-tab-selected}]
+                       :on-tab-selected on-tab-selected
+                       :tabs ["Widgets" "REPL"]}]
          ;; --- Tab 1: Widget demos ---
          [:scroll-view {:id ::widgets-tab
                         :layout-width :fill
@@ -258,7 +249,7 @@
                         :content-description "Demo text with background color"}]
            [:text-view {:text "Built with neko UI DSL"
                         :text-size [16 :sp]}]
-           [:text-view {:text counter-text
+           [:text-view {:text counter-text=
                         :text-size [20 :sp]
                         :padding default-padding}]
            [:linear-layout {:orientation :horizontal}
