@@ -51,8 +51,8 @@
     (when-let [^android.widget.TextView title-view (find-view root ::header-title)]
       (let [label (some (fn [[id label _]] (when (= id section-id) label)) sections)]
         (when label (.setText title-view ^CharSequence (str label)))))
-    ;; Close drawer
-    (when-let [^DrawerLayout dl (find-view root ::drawer)]
+    ;; Close drawer — root IS the DrawerLayout (id-holder can't find-view itself)
+    (when-let [^DrawerLayout dl @*root-view]
       (.closeDrawers dl))))
 
 (defn- nav-item
@@ -64,9 +64,8 @@
                :on-click (fn [_] (show-section! section-id))}])
 
 (defn- open-drawer! [_view]
-  (when-let [root @*root-view]
-    (when-let [^DrawerLayout dl (find-view root ::drawer)]
-      (.openDrawer dl (int android.view.Gravity/START)))))
+  (when-let [^DrawerLayout dl @*root-view]
+    (.openDrawer dl (int android.view.Gravity/START))))
 
 (defn- build-ui-tree []
   [:drawer-layout {:id ::drawer
