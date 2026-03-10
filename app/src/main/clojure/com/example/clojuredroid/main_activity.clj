@@ -22,10 +22,8 @@
             [clj-android.repl.server :as repl-server]
             [neko.doc :refer [describe]])
   (:import android.app.Activity
-           android.view.View
            android.widget.EditText
            android.widget.TextView
-           [com.google.android.material.tabs TabLayout$Tab]
            com.goodanser.clj_android.runtime.ClojureActivity))
 
 ;; Atom holding the current Activity instance. Set by make-ui
@@ -73,20 +71,6 @@
 (add-watch *ui-tree :ui-reload-watch
            (fn [_key _ref _old _new]
              (reload-ui!)))
-
-;; --- Tab switching ---
-
-(defn- on-tab-selected [tab]
-  (when-let [root @*root-view]
-    (let [^View widgets (find-view root ::widgets-tab)
-          ^View repl-tab (find-view root ::repl-tab)]
-      (when (and widgets repl-tab)
-        (case (.getPosition ^TabLayout$Tab tab)
-          0 (do (.setVisibility widgets View/VISIBLE)
-                (.setVisibility repl-tab View/GONE))
-          1 (do (.setVisibility widgets View/GONE)
-                (.setVisibility repl-tab View/VISIBLE))
-          nil)))))
 
 ;; --- nREPL controls ---
 ;; These update values in the UI the old fashioned way
@@ -225,8 +209,8 @@
                        :tab-mode :fixed
                        :tab-gravity :fill
                        :layout-width :fill
-                       :on-tab-selected on-tab-selected
-                       :tabs ["Widgets" "REPL"]}]
+                       :tab-content ["Widgets" ::widgets-tab
+                                     "REPL"    ::repl-tab]}]
          ;; --- Tab 1: Widget demos ---
          [:scroll-view {:id ::widgets-tab
                         :layout-width :fill
@@ -278,8 +262,7 @@
          [:scroll-view {:id ::repl-tab
                         :layout-width :fill
                         :layout-height 0
-                        :layout-weight 1
-                        :visibility :gone}
+                        :layout-weight 1}
           [:linear-layout {:orientation :vertical
                            :padding [32 32 32 32]
                            :layout-width :match-parent}
