@@ -245,7 +245,7 @@
                         :content-description "Demo text with background color"}]
            [:text-view {:text "Built with neko UI DSL"
                         :text-size [16 :sp]}]
-           [:text-view {:text (cell= #(str "Counter: " @counter))
+           [:text-view {:text (cell= #(str "Counter: " @counter))}]
            [:linear-layout {:orientation :horizontal}
             [:button {:text "Increment"
                       :on-click (fn [_] (swap! counter inc))}]
