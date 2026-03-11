@@ -15,6 +15,7 @@
             [neko.ui.support.drawer-layout]
             [neko.ui.support.material]
             [neko.ui.support.window-insets :as wini]
+            [neko.resource :as res]
             [com.example.clojuredroid.demos.widgets :as widgets]
             [com.example.clojuredroid.demos.lists :as lists]
             [com.example.clojuredroid.demos.material :as material]
@@ -50,68 +51,76 @@
 
 (defonce *ui-tree (atom []))
 
-(reset! *ui-tree
-        [:drawer-layout {:id ::drawer
-                         :id-holder true
-                         :layout-width :fill
-                         :layout-height :fill
-                         :drawer-content (drawer-content-spec)
-                         :drawer-title-id ::header-title}
-         ;; === Content (first child) ===
-         [:linear-layout {:orientation :vertical
-                          :layout-width :fill
-                          :layout-height :fill}
-           [:linear-layout {:id ::header
-                           :orientation :horizontal
-                           :background-color 0xFF6200EE
-                           :padding [4 8 16 8]
-                           :insets-padding :top
-                           :layout-width :fill
-                           :gravity :center-vertical}
-           [:button {:text "\u2630"
-                     :text-size [22 :sp]
-                     :text-color 0xFFFFFFFF
-                     :background-color 0xFF6200EE
-                     :min-width [48 :dp]
-                     :opens-drawer true}]
-           [:text-view {:id ::header-title
-                        :text "Widgets"
-                        :text-size [20 :sp]
-                        :text-color 0xFFFFFFFF
-                        :padding [4 0 0 0]}]]
-          ;; Section container
-          [:frame-layout {:layout-width :fill
-                          :layout-height 0
-                          :layout-weight 1}
-           (widgets/section-ui ::widgets)
-           (lists/section-ui ::lists)
-           (material/section-ui ::material)
-           (forms/section-ui ::forms)
-           (dialogs/section-ui ::dialogs)
-           (repl-ui/section-ui ::repl)]]
-         ;; === Drawer (second child, layout-gravity :start) ===
-         [:scroll-view {:layout-width [280 :dp]
-                        :layout-height :fill
-                        :layout-gravity :start
-                        :background-color 0xFFFAFAFA}
-          (into [:linear-layout {:orientation :vertical
-                                 :padding [0 24 0 0]}
-                 [:text-view {:text "Neko Demos"
-                              :text-size [22 :sp]
-                              :text-color 0xFF333333
-                              :padding [24 16 24 20]}]
-                 [:view {:background-color 0xFFDDDDDD
-                         :layout-width :fill
-                         :layout-height [1 :dp]}]]
-                (map nav-item sections))]])
-
-
+(defn- build-ui-tree
+  "Builds the full UI tree using theme colors from the given Activity."
+  [^Activity activity]
+  (let [primary         (res/get-theme-color activity :color-primary)
+        on-primary      (res/get-theme-color activity :color-on-primary)
+        surface         (res/get-theme-color activity :color-surface)
+        on-surface      (res/get-theme-color activity :color-on-surface)
+        ;; Divider: on-surface color at 12% alpha (Material 2 spec for dividers)
+        divider-color   (bit-or (bit-and (res/get-theme-color activity :color-on-surface) 0x00FFFFFF)
+                                0x1F000000)]
+    [:drawer-layout {:id ::drawer
+                     :id-holder true
+                     :layout-width :fill
+                     :layout-height :fill
+                     :drawer-content (drawer-content-spec)
+                     :drawer-title-id ::header-title}
+     ;; === Content (first child) ===
+     [:linear-layout {:orientation :vertical
+                      :layout-width :fill
+                      :layout-height :fill}
+      [:linear-layout {:id ::header
+                       :orientation :horizontal
+                       :background-color primary
+                       :padding [4 8 16 8]
+                       :insets-padding :top
+                       :layout-width :fill
+                       :gravity :center-vertical}
+       [:button {:text "\u2630"
+                 :text-size [22 :sp]
+                 :text-color on-primary
+                 :background-color primary
+                 :min-width [48 :dp]
+                 :opens-drawer true}]
+       [:text-view {:id ::header-title
+                    :text "Widgets"
+                    :text-size [20 :sp]
+                    :text-color on-primary
+                    :padding [4 0 0 0]}]]
+      ;; Section container
+      [:frame-layout {:layout-width :fill
+                      :layout-height 0
+                      :layout-weight 1}
+       (widgets/section-ui activity ::widgets)
+       (lists/section-ui activity ::lists)
+       (material/section-ui activity ::material)
+       (forms/section-ui activity ::forms)
+       (dialogs/section-ui activity ::dialogs)
+       (repl-ui/section-ui activity ::repl)]]
+     ;; === Drawer (second child, layout-gravity :start) ===
+     [:scroll-view {:layout-width [280 :dp]
+                    :layout-height :fill
+                    :layout-gravity :start
+                    :background-color surface}
+      (into [:linear-layout {:orientation :vertical
+                             :padding [0 24 0 0]}
+             [:text-view {:text "Neko Demos"
+                          :text-size [22 :sp]
+                          :text-color on-surface
+                          :padding [24 16 24 20]}]
+             [:view {:background-color divider-color
+                     :layout-width :fill
+                     :layout-height [1 :dp]}]]
+            (map nav-item sections))]]))
 
 (defn make-ui
   "Builds the UI tree using neko's declarative DSL."
   [^Activity activity]
   (reset! *activity activity)
-  (let [root (ui/make-ui activity @*ui-tree)]
+  (let [tree (build-ui-tree activity)
+        root (ui/make-ui activity tree)]
     (reset! *root-view root)
     root))
 

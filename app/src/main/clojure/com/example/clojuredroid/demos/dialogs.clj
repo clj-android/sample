@@ -2,15 +2,18 @@
   "Dialogs & Toasts demo: AlertDialog and Toast."
   (:require [neko.reactive :refer [cell cell=]]
             [neko.dialog :as dialog]
-            [neko.notify :as notify])
+            [neko.notify :as notify]
+            [neko.resource :refer [get-theme-color]])
   (:import android.content.DialogInterface
            android.view.View))
 
 (def dialog-result (cell "None"))
 
 (defn section-ui
-  "Returns the Dialogs & Toasts demo section UI tree."
-  [section-id]
+  "Returns the Dialogs & Toasts demo section UI tree.
+  `ctx` is an Android Context used to resolve theme colors."
+  [ctx section-id]
+  (let [label-color (get-theme-color ctx :text-color-secondary)]
   [:scroll-view {:id section-id
                  :layout-width :fill
                  :layout-height :fill
@@ -21,7 +24,7 @@
     ;; Toast
     [:text-view {:text "Toast"
                  :text-size [16 :sp]
-                 :text-color 0xFF666666}]
+                 :text-color label-color}]
     [:linear-layout {:orientation :horizontal
                      :padding [0 4 0 12]}
      [:button {:text "Short Toast"
@@ -34,7 +37,7 @@
     ;; AlertDialog
     [:text-view {:text "AlertDialog"
                  :text-size [16 :sp]
-                 :text-color 0xFF666666
+                 :text-color label-color
                  :padding [0 4 0 4]}]
     [:button {:text "Simple Dialog"
               :on-click (fn [^View v]
@@ -67,4 +70,4 @@
                                                         (reset! dialog-result "Done pressed"))]}))}]
     [:text-view {:text (cell= #(str "Result: " @dialog-result))
                  :text-size [15 :sp]
-                 :padding [0 8 0 0]}]]])
+                 :padding [0 8 0 0]}]]]))

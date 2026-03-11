@@ -4,6 +4,7 @@
   Call (init! activity root-view) from the main activity's on-create
   to set references for UI updates."
   (:require [neko.find-view :refer [find-view]]
+            [neko.resource :refer [get-theme-color]]
             [clj-android.repl.server :as repl-server])
   (:import android.app.Activity
            android.widget.EditText
@@ -78,7 +79,7 @@
                                0xFF00CC00)
                   (set-buttons! false true)
                   (catch Throwable t
-                    (set-status! "Error" 0xFFFF0000)
+                    (set-status! "Error" (get-theme-color @*activity :color-error))
                     (set-error! (.getMessage t))
                     (set-buttons! true false))))
               "nrepl-start"
@@ -92,11 +93,11 @@
       (fn []
         (try
           (repl-server/stop)
-          (set-status! "Stopped" 0xFFAAAAAA)
+          (set-status! "Stopped" (get-theme-color @*activity :text-color-secondary))
           (set-error! "")
           (set-buttons! true false)
           (catch Throwable t
-            (set-status! "Error" 0xFFFF0000)
+            (set-status! "Error" (get-theme-color @*activity :color-error))
             (set-error! (.getMessage t))
             (set-buttons! false true))))
       "nrepl-stop")))
@@ -114,22 +115,26 @@
         (when @*root-view
           (set-status! "Starting..." 0xFFCCCC00)
           (when-not (repl-server/repl-available?)
-            (set-status! "Unavailable" 0xFFFF0000))
+            (set-status! "Unavailable" (get-theme-color @*activity :color-error)))
           (set-buttons! false false)
           (if (repl-server/wait-for-ready :timeout-ms 60000)
             (let [p (or (repl-server/port) 7888)]
               (set-status! (str "Running on port " p) 0xFF00CC00)
               (set-buttons! false true))
             (when-not (repl-server/running?)
-              (set-status! "Stopped" 0xFFAAAAAA)
+              (set-status! "Stopped" (get-theme-color @*activity :text-color-secondary))
               (set-buttons! true false)))))
       "nrepl-status-sync")))
 
 ;; --- Section UI ---
 
 (defn section-ui
-  "Returns the nREPL controls section UI tree."
-  [section-id]
+  "Returns the nREPL controls section UI tree.
+  `ctx` is an Android Context used to resolve theme colors."
+  [ctx section-id]
+  (let [subtitle-color (get-theme-color ctx :text-color-secondary)
+        stopped-color  (get-theme-color ctx :text-color-secondary)
+        error-color    (get-theme-color ctx :color-error)]
   [:scroll-view {:id section-id
                  :layout-width :fill
                  :layout-height :fill
@@ -142,7 +147,7 @@
                  :padding [0 0 0 8]}]
     [:text-view {:text "Connect from your editor to live-reload code."
                  :text-size [14 :sp]
-                 :text-color 0xFF888888
+                 :text-color subtitle-color
                  :padding [0 0 0 16]}]
     [:linear-layout {:orientation :horizontal}
      [:text-view {:text "Port: "
@@ -154,7 +159,7 @@
     [:text-view {:id ::nrepl-status
                  :text "Stopped"
                  :text-size [16 :sp]
-                 :text-color 0xFFAAAAAA
+                 :text-color stopped-color
                  :padding [0 4 0 4]}]
     [:linear-layout {:orientation :horizontal
                      :padding [0 4 0 4]}
@@ -168,5 +173,5 @@
     [:text-view {:id ::nrepl-error
                  :text ""
                  :text-size [14 :sp]
-                 :text-color 0xFFFF0000
-                 :padding [0 4 0 0]}]]])
+                 :text-color error-color
+                 :padding [0 4 0 0]}]]]))

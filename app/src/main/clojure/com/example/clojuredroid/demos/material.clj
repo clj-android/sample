@@ -3,13 +3,17 @@
   (:require [neko.reactive :refer [cell cell=]]
             [neko.ui.support.toolbar]
             [neko.ui.support.material]
-            [neko.ui.support.card-view]))
+            [neko.ui.support.card-view]
+            [neko.resource :refer [get-theme-color]]))
 
 (def last-action (cell "None"))
 
 (defn section-ui
-  "Returns the Material Components demo section UI tree."
-  [section-id]
+  "Returns the Material Components demo section UI tree.
+  `ctx` is an Android Context used to resolve theme colors."
+  [ctx section-id]
+  (let [label-color   (get-theme-color ctx :text-color-secondary)
+        caption-color (get-theme-color ctx :text-color-secondary)]
   [:scroll-view {:id section-id
                  :layout-width :fill
                  :layout-height :fill
@@ -20,7 +24,7 @@
     ;; Toolbar with menu
     [:text-view {:text "Toolbar with :menu trait"
                  :text-size [16 :sp]
-                 :text-color 0xFF666666
+                 :text-color label-color
                  :padding [0 0 0 4]}]
     [:toolbar {:toolbar-title "Sample Toolbar"
                :toolbar-subtitle "Tap overflow menu \u2192"
@@ -38,7 +42,7 @@
     ;; CardView
     [:text-view {:text "CardView"
                  :text-size [16 :sp]
-                 :text-color 0xFF666666
+                 :text-color label-color
                  :padding [0 8 0 4]}]
     [:card-view {:card-elevation [4 :dp]
                  :card-corner-radius [8 :dp]
@@ -49,7 +53,7 @@
                    :text-size [18 :sp]}]
       [:text-view {:text "Content inside a CardView with elevation and rounded corners."
                    :text-size [14 :sp]
-                   :text-color 0xFF666666
+                   :text-color label-color
                    :padding [0 4 0 0]}]]]
 
     [:card-view {:card-elevation [2 :dp]
@@ -70,12 +74,12 @@
     ;; FloatingActionButton
     [:text-view {:text "FloatingActionButton"
                  :text-size [16 :sp]
-                 :text-color 0xFF666666
+                 :text-color label-color
                  :padding [0 20 0 4]}]
     [:floating-action-button {:fab-size :normal
                               :on-click (fn [_]
                                           (reset! last-action "FAB clicked!"))}]
     [:text-view {:text "Tap the FAB above"
                  :text-size [12 :sp]
-                 :text-color 0xFF999999
-                 :padding [0 4 0 0]}]]])
+                 :text-color caption-color
+                 :padding [0 4 0 0]}]]]))

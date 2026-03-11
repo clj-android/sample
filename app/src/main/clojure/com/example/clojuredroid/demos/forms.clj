@@ -1,13 +1,17 @@
 (ns com.example.clojuredroid.demos.forms
   "Forms & Input demo: on-text-change, character count, input types."
-  (:require [neko.reactive :refer [cell cell=]]))
+  (:require [neko.reactive :refer [cell cell=]]
+            [neko.resource :refer [get-theme-color]]))
 
 (def text-mirror (cell ""))
 (def char-count (cell 0))
 
 (defn section-ui
-  "Returns the Forms demo section UI tree."
-  [section-id]
+  "Returns the Forms demo section UI tree.
+  `ctx` is an Android Context used to resolve theme colors."
+  [ctx section-id]
+  (let [label-color   (get-theme-color ctx :text-color-secondary)
+        caption-color (get-theme-color ctx :text-color-secondary)]
   [:scroll-view {:id section-id
                  :layout-width :fill
                  :layout-height :fill
@@ -18,7 +22,7 @@
     ;; Live text mirror
     [:text-view {:text "Text Mirror (:on-text-change)"
                  :text-size [16 :sp]
-                 :text-color 0xFF666666}]
+                 :text-color label-color}]
     [:edit-text {:hint "Type here to see live updates..."
                  :layout-width :fill
                  :on-text-change (fn [text]
@@ -28,13 +32,13 @@
                  :padding [0 4 0 0]}]
     [:text-view {:text (cell= #(str "Characters: " @char-count))
                  :text-size [13 :sp]
-                 :text-color 0xFF999999
+                 :text-color caption-color
                  :padding [0 2 0 16]}]
 
     ;; Input types
     [:text-view {:text "Input Types (:input-type)"
                  :text-size [16 :sp]
-                 :text-color 0xFF666666
+                 :text-color label-color
                  :padding [0 8 0 4]}]
     [:edit-text {:hint "Number input"
                  :input-type :number
@@ -51,4 +55,4 @@
     [:edit-text {:hint "Password input"
                  :input-type :password
                  :layout-width :fill
-                 :padding [12 12 12 12]}]]])
+                 :padding [12 12 12 12]}]]]))

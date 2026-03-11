@@ -2,15 +2,19 @@
   "Lists & Adapters demo: RecyclerView with declarative :recycler-items trait."
   (:require [neko.reactive :refer [cell cell=]]
             [neko.ui.support.recycler-view]
-            [neko.ui.support.adapters]))
+            [neko.ui.support.adapters]
+            [neko.resource :refer [get-theme-color]]))
 
 (def items (atom ["Apple" "Banana" "Cherry" "Date" "Elderberry"]))
 (def item-count= (cell= #(str (count @items) " items")))
 (def next-num (atom 5))
 
 (defn section-ui
-  "Returns the Lists demo section UI tree."
-  [section-id]
+  "Returns the Lists demo section UI tree.
+  `ctx` is an Android Context used to resolve theme colors."
+  [ctx section-id]
+  (let [label-color   (get-theme-color ctx :text-color-secondary)
+        caption-color (get-theme-color ctx :text-color-secondary)]
   [:linear-layout {:id section-id
                    :orientation :vertical
                    :layout-width :fill
@@ -21,10 +25,10 @@
                     :layout-width :match-parent}
     [:text-view {:text "RecyclerView with :recycler-items"
                  :text-size [16 :sp]
-                 :text-color 0xFF666666}]
+                 :text-color label-color}]
     [:text-view {:text item-count=
                  :text-size [14 :sp]
-                 :text-color 0xFF999999
+                 :text-color caption-color
                  :padding [0 2 0 4]}]
     [:linear-layout {:orientation :horizontal
                      :padding [0 4 0 8]}
@@ -53,8 +57,8 @@
                                                   :layout-width :match-parent}
                                   [:text-view {:text (str (inc pos) ".")
                                                :text-size [16 :sp]
-                                               :text-color 0xFF999999
+                                               :text-color caption-color
                                                :min-width [32 :dp]}]
                                   [:text-view {:text (str data)
                                                :text-size [16 :sp]
-                                               :padding [8 0 0 0]}]])}]])
+                                               :padding [8 0 0 0]}]])}]]))
