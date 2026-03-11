@@ -67,7 +67,7 @@
 (defn- tc [kw] (res/get-theme-color @*activity kw))
 
 ;; Guard: when rebuild-ui-tree! does its internal reset!, we don't want the
-;; :reload watch to fire (that would cause make-ui → rebuild → watch → loop).
+;; :reload watch to also fire — that would trigger a redundant second reload.
 ;; External resets (e.g. from the REPL) still trigger reload normally.
 (defonce ^:private building? (volatile! false))
 
