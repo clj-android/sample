@@ -125,7 +125,7 @@
                     :layout-gravity :start
                     :background-color (tc :color-surface)}
       (into [:linear-layout {:orientation :vertical
-                             :padding [0 24 0 0]}
+                             :insets-padding :top}
              [:text-view {:text "Neko Demos"
                           :text-size [22 :sp]
                           :text-color (tc :color-on-surface)
