@@ -15,6 +15,7 @@
             [neko.find-view :refer [find-view]]
             [neko.ui.support.drawer-layout]
             [neko.ui.support.material]
+            [neko.threading :refer [on-ui]]
             [com.example.clojuredroid.demos.widgets :as widgets]
             [com.example.clojuredroid.demos.lists :as lists]
             [com.example.clojuredroid.demos.material :as material]
@@ -48,69 +49,70 @@
                :padding [24 14 24 14]
                :nav-for section-id}])
 
-(defn- build-ui-tree []
-  [:drawer-layout {:id ::drawer
-                   :id-holder true
-                   :layout-width :fill
-                   :layout-height :fill
-                   :drawer-content (drawer-content-spec)
-                   :drawer-title-id ::header-title}
-   ;; === Content (first child) ===
-   [:linear-layout {:orientation :vertical
-                    :layout-width :fill
-                    :layout-height :fill}
-    ;; Header bar — top padding set in on-create to account for status bar
-    [:linear-layout {:id ::header
-                     :orientation :horizontal
-                     :background-color 0xFF6200EE
-                     :padding [4 8 16 8]
-                     :layout-width :fill
-                     :gravity :center-vertical}
-     [:button {:text "\u2630"
-               :text-size [22 :sp]
-               :text-color 0xFFFFFFFF
-               :background-color 0xFF6200EE
-               :min-width [48 :dp]
-               :opens-drawer true}]
-     [:text-view {:id ::header-title
-                  :text "Widgets"
-                  :text-size [20 :sp]
-                  :text-color 0xFFFFFFFF
-                  :padding [4 0 0 0]}]]
-    ;; Section container
-    [:frame-layout {:layout-width :fill
-                    :layout-height 0
-                    :layout-weight 1}
-     (widgets/section-ui ::widgets)
-     (lists/section-ui ::lists)
-     (material/section-ui ::material)
-     (forms/section-ui ::forms)
-     (dialogs/section-ui ::dialogs)
-     (repl-ui/section-ui ::repl)]]
-   ;; === Drawer (second child, layout-gravity :start) ===
-   [:scroll-view {:layout-width [280 :dp]
-                  :layout-height :fill
-                  :layout-gravity :start
-                  :background-color 0xFFFAFAFA}
-    (into [:linear-layout {:orientation :vertical
-                           :padding [0 24 0 0]}
-           [:text-view {:text "Neko Demos"
-                        :text-size [22 :sp]
-                        :text-color 0xFF333333
-                        :padding [24 16 24 20]}]
-           [:view {:background-color 0xFFDDDDDD
-                   :layout-width :fill
-                   :layout-height [1 :dp]}]]
-          (map nav-item sections))]])
+(defonce *ui-tree (atom []))
 
-(defonce *ui-tree (atom nil))
+(reset! *ui-tree
+        [:drawer-layout {:id ::drawer
+                         :id-holder true
+                         :layout-width :fill
+                         :layout-height :fill
+                         :drawer-content (drawer-content-spec)
+                         :drawer-title-id ::header-title}
+         ;; === Content (first child) ===
+         [:linear-layout {:orientation :vertical
+                          :layout-width :fill
+                          :layout-height :fill}
+          ;; Header bar — top padding set in on-create to account for status bar
+          [:linear-layout {:id ::header
+                           :orientation :horizontal
+                           :background-color 0xFF6200EE
+                           :padding [4 8 16 8]
+                           :layout-width :fill
+                           :gravity :center-vertical}
+           [:button {:text "\u2630"
+                     :text-size [22 :sp]
+                     :text-color 0xFFFFFFFF
+                     :background-color 0xFF6200EE
+                     :min-width [48 :dp]
+                     :opens-drawer true}]
+           [:text-view {:id ::header-title
+                        :text "Widgets"
+                        :text-size [20 :sp]
+                        :text-color 0xFFFFFFFF
+                        :padding [4 0 0 0]}]]
+          ;; Section container
+          [:frame-layout {:layout-width :fill
+                          :layout-height 0
+                          :layout-weight 1}
+           (widgets/section-ui ::widgets)
+           (lists/section-ui ::lists)
+           (material/section-ui ::material)
+           (forms/section-ui ::forms)
+           (dialogs/section-ui ::dialogs)
+           (repl-ui/section-ui ::repl)]]
+         ;; === Drawer (second child, layout-gravity :start) ===
+         [:scroll-view {:layout-width [280 :dp]
+                        :layout-height :fill
+                        :layout-gravity :start
+                        :background-color 0xFFFAFAFA}
+          (into [:linear-layout {:orientation :vertical
+                                 :padding [0 24 0 0]}
+                 [:text-view {:text "Neko Demos"
+                              :text-size [22 :sp]
+                              :text-color 0xFF333333
+                              :padding [24 16 24 20]}]
+                 [:view {:background-color 0xFFDDDDDD
+                         :layout-width :fill
+                         :layout-height [1 :dp]}]]
+                (map nav-item sections))]])
+
+
 
 (defn make-ui
   "Builds the UI tree using neko's declarative DSL."
   [^Activity activity]
   (reset! *activity activity)
-  (let [tree (or @*ui-tree (build-ui-tree))
-        root (ui/make-ui activity tree)]
+  (let [root (ui/make-ui activity @*ui-tree)]
     (reset! *root-view root)
     root))
 
@@ -121,6 +123,16 @@
         id  (.getIdentifier res "status_bar_height" "dimen" "android")]
     (if (pos? id) (.getDimensionPixelSize res id) 0)))
 
+(defn set-status-bar! [^Activity activity]
+  (let [sb-height (status-bar-height activity)]
+      (when-let [^View header (find-view @*root-view ::header)]
+        (on-ui
+         (.setPadding header
+                      (.getPaddingLeft header)
+                      (+ (.getPaddingTop header) sb-height)
+                      (.getPaddingRight header)
+                      (.getPaddingBottom header))))))
+
 (defn on-create
   "Called automatically by ClojureActivity when the activity is created."
   [^Activity activity saved-instance-state]
@@ -128,13 +140,7 @@
     (.setContentView activity ^View root)
     ;; Match status bar color to header and add inset padding
     (.. activity getWindow (setStatusBarColor (unchecked-int 0xFF6200EE)))
-    (let [sb-height (status-bar-height activity)]
-      (when-let [^View header (find-view root ::header)]
-        (.setPadding header
-                     (.getPaddingLeft header)
-                     (+ (.getPaddingTop header) sb-height)
-                     (.getPaddingRight header)
-                     (.getPaddingBottom header))))
+    (set-status-bar! activity)
     ;; Initialize sub-namespaces
     (repl-ui/init! activity root)
     (widgets/init! root activity)))
@@ -144,9 +150,14 @@
   []
   (when-let [activity (ClojureActivity/getInstance
                         "com.example.clojuredroid.main-activity")]
-    (.reloadUi ^ClojureActivity activity)))
+    (.reloadUi ^ClojureActivity activity)
+    (set-status-bar! activity)))
 
 ;; Sync nREPL status when UI reloads
 (add-watch *ui-tree :nrepl-status-watch
            (fn [_key _ref _old _new]
              (repl-ui/sync-status!)))
+
+(add-watch *ui-tree :nrepl-status-watch
+           (fn [_key _ref _old _new]
+             (reload-ui!)))
