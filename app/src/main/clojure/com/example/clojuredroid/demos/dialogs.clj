@@ -7,7 +7,7 @@
   (:import android.content.DialogInterface
            android.view.View))
 
-(def dialog-result (cell "None"))
+(def dialog-result** (cell "None"))
 
 (defn section-ui
   "Returns the Dialogs & Toasts demo section UI tree.
@@ -45,9 +45,9 @@
                             {:title "Hello"
                              :message "This is a simple AlertDialog built with neko.dialog/alert."
                              :positive-button ["OK" (fn [_ _]
-                                                      (reset! dialog-result "OK pressed"))]
+                                                      (reset! dialog-result* "OK pressed"))]
                              :negative-button ["Cancel" (fn [_ _]
-                                                          (reset! dialog-result "Cancel pressed"))]}))}]
+                                                          (reset! dialog-result* "Cancel pressed"))]}))}]
     [:button {:text "List Dialog"
               :on-click (fn [^View v]
                           (let [fruits ["Apple" "Banana" "Cherry" "Date"]]
@@ -55,7 +55,7 @@
                               {:title "Pick a fruit"
                                :items fruits
                                :on-item-click (fn [d pos]
-                                                (reset! dialog-result
+                                                (reset! dialog-result*
                                                         (str "Picked: " (nth fruits pos)))
                                                 (.dismiss ^DialogInterface d))})))}]
     [:button {:text "Cancelable Dialog"
@@ -65,9 +65,9 @@
                              :message "Tap outside or press back to cancel."
                              :cancelable true
                              :on-cancel (fn [_]
-                                          (reset! dialog-result "Dialog cancelled"))
+                                          (reset! dialog-result* "Dialog cancelled"))
                              :positive-button ["Done" (fn [_ _]
-                                                        (reset! dialog-result "Done pressed"))]}))}]
-    [:text-view {:text (cell= #(str "Result: " @dialog-result))
+                                                        (reset! dialog-result* "Done pressed"))]}))}]
+    [:text-view {:text (cell= #(str "Result: " @dialog-result*))
                  :text-size [15 :sp]
                  :padding [0 8 0 0]}]]]))

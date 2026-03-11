@@ -6,7 +6,7 @@
             [neko.ui.support.card-view]
             [neko.resource :refer [get-theme-color]]))
 
-(def last-action (cell "None"))
+(def last-action* (cell "None"))
 
 (defn section-ui
   "Returns the Material Components demo section UI tree.
@@ -34,9 +34,9 @@
                       {:id ::refresh :title "Refresh"}
                       {:id ::settings :title "Settings"}]
                :on-menu-item-click (fn [id]
-                                     (reset! last-action
+                                     (reset! last-action*
                                              (str "Menu: " (name id))))}]
-    [:text-view {:text (cell= #(str "Last action: " @last-action))
+    [:text-view {:text (cell= #(str "Last action: " @last-action*))
                  :padding [0 8 0 16]}]
 
     ;; CardView
@@ -78,7 +78,7 @@
                  :padding [0 20 0 4]}]
     [:floating-action-button {:fab-size :normal
                               :on-click (fn [_]
-                                          (reset! last-action "FAB clicked!"))}]
+                                          (reset! last-action* "FAB clicked!"))}]
     [:text-view {:text "Tap the FAB above"
                  :text-size [12 :sp]
                  :text-color caption-color

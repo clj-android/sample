@@ -6,14 +6,14 @@
 
 ;; Sensor cells, initialized lazily on first section-ui call.
 ;; defonce ensures they survive UI rebuilds without re-registering.
-(defonce ^:private *accel (atom nil))
-(defonce ^:private *gyro  (atom nil))
-(defonce ^:private *light (atom nil))
+(defonce ^:private accel* (atom nil))
+(defonce ^:private gyro*  (atom nil))
+(defonce ^:private light* (atom nil))
 
 (defn- ensure-sensors! [ctx]
-  (when-not @*accel (reset! *accel (sensor/sensor-cell ctx :accelerometer)))
-  (when-not @*gyro  (reset! *gyro  (sensor/sensor-cell ctx :gyroscope)))
-  (when-not @*light (reset! *light (sensor/sensor-cell ctx :light))))
+  (when-not @accel* (reset! accel* (sensor/sensor-cell ctx :accelerometer)))
+  (when-not @gyro*  (reset! gyro*  (sensor/sensor-cell ctx :gyroscope)))
+  (when-not @light* (reset! light* (sensor/sensor-cell ctx :light))))
 
 ;; ---------------------------------------------------------------------------
 ;; Formatting helpers
@@ -56,7 +56,7 @@
     [:text-view {:text "Accelerometer (m/s²)"
                  :text-size [16 :sp]
                  :text-color label-color}]
-    [:text-view {:text (fmt3 @*accel "accel")
+    [:text-view {:text (fmt3 @accel* "accel")
                  :text-size [14 :sp]
                  :padding [0 2 0 12]}]
 
@@ -64,7 +64,7 @@
     [:text-view {:text "Gyroscope (rad/s)"
                  :text-size [16 :sp]
                  :text-color label-color}]
-    [:text-view {:text (fmt3 @*gyro "gyro")
+    [:text-view {:text (fmt3 @gyro* "gyro")
                  :text-size [14 :sp]
                  :padding [0 2 0 12]}]
 
@@ -72,7 +72,7 @@
     [:text-view {:text "Light sensor (lux)"
                  :text-size [16 :sp]
                  :text-color label-color}]
-    [:text-view {:text (fmt1 @*light "lux")
+    [:text-view {:text (fmt1 @light* "lux")
                  :text-size [14 :sp]
                  :padding [0 2 0 12]}]
 

@@ -15,7 +15,7 @@
     (ui/rebuild-ui-tree!)
 
     ;; Or set an arbitrary tree and reload:
-    (reset! ui/*ui-tree [...])
+    (reset! ui/ui-tree* [...])
     (ui/reload-ui!)"
   (:require [neko.ui :as ui]
             [neko.ui.support.drawer-layout]
@@ -33,8 +33,8 @@
            android.view.View
            com.goodanser.clj_android.runtime.ClojureActivity))
 
-(defonce *activity (atom nil))
-(defonce *root-view (atom nil))
+(defonce activity* (atom nil))
+(defonce root-view* (atom nil))
 
 ;; Section definitions: [keyword label section-fn]
 (def ^:private sections
@@ -59,30 +59,30 @@
 
 ;; Theme color helper.
 ;;
-;; Reads from @*activity at call time, so colors are always current.
+;; Reads from @activity* at call time, so colors are always current.
 ;; Using functions (rather than atoms) means theme changes take effect
 ;; automatically: when the user toggles dark/light mode, Android recreates
-;; the Activity, make-ui resets *activity, and the next rebuild-ui-tree! call
+;; the Activity, make-ui resets activity*, and the next rebuild-ui-tree! call
 ;; gets fresh colors without any explicit invalidation.
-(defn- tc [kw] (res/get-theme-color @*activity kw))
+(defn- tc [kw] (res/get-theme-color @activity* kw))
 
 ;; Guard: when rebuild-ui-tree! does its internal reset!, we don't want the
 ;; :reload watch to also fire — that would trigger a redundant second reload.
 ;; External resets (e.g. from the REPL) still trigger reload normally.
 (defonce ^:private building? (volatile! false))
 
-(defonce *ui-tree (atom []))
+(defonce ui-tree* (atom []))
 
 (declare reload-ui!)
 
 (defn rebuild-ui-tree!
-  "Rebuilds *ui-tree from the current theme and section UIs, then
+  "Rebuilds ui-tree* from the current theme and section UIs, then
   hot-reloads the live view. Call from the REPL after redefining this
   function to pick up structural or theme changes:
     (rebuild-ui-tree!)"
   []
   (vreset! building? true)
-  (reset! *ui-tree
+  (reset! ui-tree*
     [:drawer-layout {:id ::drawer
                      :id-holder true
                      :layout-width :fill
@@ -115,13 +115,13 @@
       [:frame-layout {:layout-width :fill
                       :layout-height 0
                       :layout-weight 1}
-       (widgets/section-ui @*activity ::widgets)
-       (lists/section-ui @*activity ::lists)
-       (material/section-ui @*activity ::material)
-       (forms/section-ui @*activity ::forms)
-       (dialogs/section-ui @*activity ::dialogs)
-       (sensors/section-ui @*activity ::sensors)
-       (repl-ui/section-ui @*activity ::repl)]]
+       (widgets/section-ui @activity* ::widgets)
+       (lists/section-ui @activity* ::lists)
+       (material/section-ui @activity* ::material)
+       (forms/section-ui @activity* ::forms)
+       (dialogs/section-ui @activity* ::dialogs)
+       (sensors/section-ui @activity* ::sensors)
+       (repl-ui/section-ui @activity* ::repl)]]
      ;; === Drawer (second child, layout-gravity :start) ===
      [:scroll-view {:layout-width [280 :dp]
                     :layout-height :fill
@@ -143,11 +143,11 @@
   (reload-ui!))
 
 (defn make-ui
-  "Renders @*ui-tree into a live view. Called by ClojureActivity.reloadUi."
+  "Renders @ui-tree* into a live view. Called by ClojureActivity.reloadUi."
   [^Activity activity]
-  (reset! *activity activity)
-  (let [root (ui/make-ui activity @*ui-tree)]
-    (reset! *root-view root)
+  (reset! activity* activity)
+  (let [root (ui/make-ui activity @ui-tree*)]
+    (reset! root-view* root)
     (repl-ui/init! activity root)
     root))
 
@@ -155,7 +155,7 @@
   "Called automatically by ClojureActivity when the activity is created."
   [^Activity activity saved-instance-state]
   (wini/enable-edge-to-edge! activity)
-  (reset! *activity activity)
+  (reset! activity* activity)
   (rebuild-ui-tree!))
 
 (defn reload-ui!
@@ -165,9 +165,9 @@
                         "com.example.clojuredroid.main-activity")]
     (.reloadUi ^ClojureActivity activity)))
 
-;; REPL hot-reload: (reset! *ui-tree [...]) triggers a live reload.
+;; REPL hot-reload: (reset! ui-tree* [...]) triggers a live reload.
 ;; Internal rebuilds via rebuild-ui-tree! set building? and are ignored.
-(add-watch *ui-tree :reload
+(add-watch ui-tree* :reload
            (fn [_ _ _ _]
              (when-not @building?
                (reload-ui!))))
