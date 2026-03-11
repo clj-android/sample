@@ -23,13 +23,12 @@
             [com.example.clojuredroid.repl :as repl-ui])
   (:import android.app.Activity
            android.view.View
-           [androidx.drawerlayout.widget DrawerLayout]
            com.goodanser.clj_android.runtime.ClojureActivity))
 
 (defonce *activity (atom nil))
 (defonce *root-view (atom nil))
 
-;; Section definitions: [keyword label namespace-section-fn]
+;; Section definitions: [keyword label section-fn]
 (def ^:private sections
   [[::widgets  "Widgets"             widgets/section-ui]
    [::lists    "Lists & Adapters"    lists/section-ui]
@@ -38,22 +37,8 @@
    [::dialogs  "Dialogs & Toasts"    dialogs/section-ui]
    [::repl     "nREPL"               repl-ui/section-ui]])
 
-(def ^:private section-ids (mapv first sections))
-
-(defn- show-section!
-  "Shows the section with the given ID, hides all others, closes the drawer."
-  [section-id]
-  (when-let [root @*root-view]
-    (doseq [id section-ids]
-      (when-let [^View v (find-view root id)]
-        (.setVisibility v (if (= id section-id) View/VISIBLE View/GONE))))
-    ;; Update header title
-    (when-let [^android.widget.TextView title-view (find-view root ::header-title)]
-      (let [label (some (fn [[id label _]] (when (= id section-id) label)) sections)]
-        (when label (.setText title-view ^CharSequence (str label)))))
-    ;; Close drawer — root IS the DrawerLayout (id-holder can't find-view itself)
-    (when-let [^DrawerLayout dl @*root-view]
-      (.closeDrawers dl))))
+(defn- drawer-content-spec []
+  (vec (mapcat (fn [[id label _]] [label id]) sections)))
 
 (defn- nav-item
   "Returns a UI tree for a single navigation drawer item."
@@ -61,17 +46,15 @@
   [:text-view {:text label
                :text-size [16 :sp]
                :padding [24 14 24 14]
-               :on-click (fn [_] (show-section! section-id))}])
-
-(defn- open-drawer! [_view]
-  (when-let [^DrawerLayout dl @*root-view]
-    (.openDrawer dl (int android.view.Gravity/START))))
+               :nav-for section-id}])
 
 (defn- build-ui-tree []
   [:drawer-layout {:id ::drawer
                    :id-holder true
                    :layout-width :fill
-                   :layout-height :fill}
+                   :layout-height :fill
+                   :drawer-content (drawer-content-spec)
+                   :drawer-title-id ::header-title}
    ;; === Content (first child) ===
    [:linear-layout {:orientation :vertical
                     :layout-width :fill
@@ -88,7 +71,7 @@
                :text-color 0xFFFFFFFF
                :background-color 0xFF6200EE
                :min-width [48 :dp]
-               :on-click open-drawer!}]
+               :opens-drawer true}]
      [:text-view {:id ::header-title
                   :text "Widgets"
                   :text-size [20 :sp]
@@ -154,9 +137,7 @@
                      (.getPaddingBottom header))))
     ;; Initialize sub-namespaces
     (repl-ui/init! activity root)
-    (widgets/init! root activity)
-    ;; Show default section
-    (show-section! ::widgets)))
+    (widgets/init! root activity)))
 
 (defn reload-ui!
   "Hot-reload the UI from the REPL."
