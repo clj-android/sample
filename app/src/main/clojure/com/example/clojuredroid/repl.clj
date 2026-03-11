@@ -1,48 +1,97 @@
 (ns com.example.clojuredroid.repl
   "nREPL server controls for the sample app.
 
-  Call (init! activity root-view) from the main activity's on-create
-  to set references for UI updates."
+  State is held in a reactive cell (*state) so the UI always reflects the
+  true server state, regardless of when the view is built or rebuilt."
   (:require [neko.find-view :refer [find-view]]
             [neko.resource :refer [get-theme-color]]
-            [clj-android.repl.server :as repl-server]
-            [neko.threading :refer [on-ui]])
-  (:import android.app.Activity
-           android.widget.EditText
-           android.widget.TextView))
+            [neko.reactive :refer [cell cell=]]
+            [clj-android.repl.server :as repl-server])
+  (:import android.widget.EditText))
 
-;; Set by main-activity via init!
-(defonce *activity (atom nil))
+;; ---------------------------------------------------------------------------
+;; State cells (defonce — survive UI rebuilds)
+;; ---------------------------------------------------------------------------
+
+;; :status  — :unknown | :starting | :running | :stopping | :stopped | :error | :unavailable
+;; :port    — integer when running, else nil
+;; :error   — string when :error, else nil
+(defonce *state (cell {:status :unknown :port nil :error nil}))
+
+;; Theme colors for the current activity, updated in section-ui.
+(defonce *theme-colors (cell nil))
+
+;; Derived formula cells — auto-recompute when *state or *theme-colors changes.
+(defonce *status-text
+  (cell= #(let [{:keys [status port]} @*state]
+            (case status
+              :starting    "Starting..."
+              :stopping    "Stopping..."
+              :running     (str "Running on port " port)
+              :stopped     "Stopped"
+              :error       "Error"
+              :unavailable "Unavailable"
+              "Stopped"))))
+
+(defonce *status-color
+  (cell= #(let [{:keys [status]}      @*state
+                {:keys [secondary
+                        error-color]} (or @*theme-colors {})]
+            (case status
+              :running  0xFF00CC00
+              :starting 0xFFCCCC00
+              :stopping 0xFFCCCC00
+              (:error :unavailable) (or error-color 0xFFFF4444)
+              (or secondary 0xFF888888)))))
+
+(defonce *error-text
+  (cell= #(or (:error @*state) "")))
+
+(defonce *start-enabled
+  (cell= #(contains? #{:stopped :error} (:status @*state))))
+
+(defonce *stop-enabled
+  (cell= #(= :running (:status @*state))))
+
+;; ---------------------------------------------------------------------------
+;; Root-view reference (for reading the port input field)
+;; ---------------------------------------------------------------------------
+
 (defonce *root-view (atom nil))
 
+;; ---------------------------------------------------------------------------
+;; Auto-start watcher (defonce — starts once at namespace load)
+;; ---------------------------------------------------------------------------
+
+(defonce ^:private _auto-start-watcher
+  (doto (Thread.
+          (fn []
+            (if-not (repl-server/repl-available?)
+              (reset! *state {:status :unavailable :port nil :error nil})
+              (do
+                (when-not (repl-server/running?)
+                  (reset! *state {:status :starting :port nil :error nil}))
+                (if (repl-server/wait-for-ready :timeout-ms 60000)
+                  (reset! *state {:status  :running
+                                  :port    (or (repl-server/port) 7888)
+                                  :error   nil})
+                  (when-not (repl-server/running?)
+                    (reset! *state {:status :stopped :port nil :error nil}))))))
+          "nrepl-auto-start-watcher")
+    .start))
+
+;; ---------------------------------------------------------------------------
+;; Init (called from make-ui after each view rebuild)
+;; ---------------------------------------------------------------------------
+
 (defn init!
-  "Provides activity and root-view references for UI updates."
-  [activity root-view]
-  (reset! *activity activity)
+  "Stores the new root-view for port-input access."
+  [_activity root-view]
   (reset! *root-view root-view))
 
-;; --- UI helpers ---
-
-(defn- set-status! [text color]
-  (on-ui
-    (fn []
-      (when-let [^TextView v (find-view @*root-view ::nrepl-status)]
-        (.setText v (str text))
-        (.setTextColor v (unchecked-int color))))))
-
-(defn- set-error! [text]
-  (on-ui
-    (fn []
-      (when-let [^TextView v (find-view @*root-view ::nrepl-error)]
-        (.setText v (str text))))))
-
-(defn- set-buttons! [start-enabled? stop-enabled?]
-  (on-ui
-    (fn []
-      (when-let [^android.view.View v (find-view @*root-view ::nrepl-start-btn)]
-        (.setEnabled v (boolean start-enabled?)))
-      (when-let [^android.view.View v (find-view @*root-view ::nrepl-stop-btn)]
-        (.setEnabled v (boolean stop-enabled?))))))
+;; ---------------------------------------------------------------------------
+;; Button handlers
+;; ---------------------------------------------------------------------------
 
 (defn- parse-port [^EditText et]
   (try
@@ -50,125 +99,93 @@
       (when (<= 1 p 65535) p))
     (catch NumberFormatException _ nil)))
 
-;; --- nREPL actions ---
-
 (defn- on-start-nrepl [_view]
   (when-let [root @*root-view]
-    (let [port (some-> (find-view root ::nrepl-port-input) (parse-port))]
+    (let [port (some-> (find-view root ::nrepl-port-input) parse-port)]
       (if-not port
-        (set-error! "Invalid port (1\u201365535)")
+        (swap! *state assoc :error "Invalid port (1\u201365535)")
         (do
-          (set-error! "")
-          (set-status! "Starting..." 0xFFCCCC00)
-          (set-buttons! false false)
+          (reset! *state {:status :starting :port nil :error nil})
           (.start
             (Thread.
               (.getThreadGroup (Thread/currentThread))
               (fn []
                 (try
-                  (if (repl-server/running?)
-                    (set-status! (str "Running on port "
-                                      (or (repl-server/port) port))
-                                 0xFF00CC00)
-                    (repl-server/start port))
-                  (set-status! (str "Running on port "
-                                    (or (repl-server/port) port))
-                               0xFF00CC00)
-                  (set-buttons! false true)
+                  (repl-server/start port)
+                  (reset! *state {:status :running
+                                  :port   (or (repl-server/port) port)
+                                  :error  nil})
                   (catch Throwable t
-                    (set-status! "Error" (get-theme-color @*activity :color-error))
-                    (set-error! (.getMessage t))
-                    (set-buttons! true false))))
+                    (reset! *state {:status :error
+                                    :port   nil
+                                    :error  (.getMessage t)}))))
               "nrepl-start"
               1048576)))))))
 
 (defn- on-stop-nrepl [_view]
-  (set-status! "Stopping..." 0xFFCCCC00)
-  (set-buttons! false false)
+  (reset! *state {:status :stopping :port nil :error nil})
   (.start
     (Thread.
       (fn []
         (try
           (repl-server/stop)
-          (set-status! "Stopped" (get-theme-color @*activity :text-color-secondary))
-          (set-error! "")
-          (set-buttons! true false)
+          (reset! *state {:status :stopped :port nil :error nil})
           (catch Throwable t
-            (set-status! "Error" (get-theme-color @*activity :color-error))
-            (set-error! (.getMessage t))
-            (set-buttons! false true))))
+            (reset! *state {:status :error
+                            :port   nil
+                            :error  (.getMessage t)}))))
       "nrepl-stop")))
 
-(defn sync-status!
-  "Waits for nREPL auto-start completion and updates the UI."
-  []
-  (.start
-    (Thread.
-      (fn []
-        (loop [waited 0]
-          (when (and (nil? @*root-view) (< waited 10000))
-            (Thread/sleep 500)
-            (recur (+ waited 500))))
-        (when @*root-view
-          (set-status! "Starting..." 0xFFCCCC00)
-          (when-not (repl-server/repl-available?)
-            (set-status! "Unavailable" (get-theme-color @*activity :color-error)))
-          (set-buttons! false false)
-          (if (repl-server/wait-for-ready :timeout-ms 60000)
-            (let [p (or (repl-server/port) 7888)]
-              (set-status! (str "Running on port " p) 0xFF00CC00)
-              (set-buttons! false true))
-            (when-not (repl-server/running?)
-              (set-status! "Stopped" (get-theme-color @*activity :text-color-secondary))
-              (set-buttons! true false)))))
-      "nrepl-status-sync")))
-
-;; --- Section UI ---
+;; ---------------------------------------------------------------------------
+;; Section UI
+;; ---------------------------------------------------------------------------
 
 (defn section-ui
   "Returns the nREPL controls section UI tree.
-  `ctx` is an Android Context used to resolve theme colors."
+  Also updates *theme-colors so derived cells use current theme."
   [ctx section-id]
-  (let [subtitle-color (get-theme-color ctx :text-color-secondary)
-        stopped-color  (get-theme-color ctx :text-color-secondary)
-        error-color    (get-theme-color ctx :color-error)]
-  [:scroll-view {:id section-id
-                 :layout-width :fill
-                 :layout-height :fill
-                 :visibility :gone}
-   [:linear-layout {:orientation :vertical
-                    :padding [16 16 16 16]
-                    :layout-width :match-parent}
-    [:text-view {:text "nREPL Server"
-                 :text-size [22 :sp]
-                 :padding [0 0 0 8]}]
-    [:text-view {:text "Connect from your editor to live-reload code."
-                 :text-size [14 :sp]
-                 :text-color subtitle-color
-                 :padding [0 0 0 16]}]
-    [:linear-layout {:orientation :horizontal}
-     [:text-view {:text "Port: "
-                  :text-size [16 :sp]
-                  :padding [0 8 8 0]}]
-     [:edit-text {:id ::nrepl-port-input
-                  :text "7888"
-                  :input-type :number}]]
-    [:text-view {:id ::nrepl-status
-                 :text "Stopped"
-                 :text-size [16 :sp]
-                 :text-color stopped-color
-                 :padding [0 4 0 4]}]
-    [:linear-layout {:orientation :horizontal
-                     :padding [0 4 0 4]}
-     [:button {:id ::nrepl-start-btn
-               :text "Start"
-               :on-click on-start-nrepl}]
-     [:button {:id ::nrepl-stop-btn
-               :text "Stop"
-               :enabled false
-               :on-click on-stop-nrepl}]]
-    [:text-view {:id ::nrepl-error
-                 :text ""
-                 :text-size [14 :sp]
-                 :text-color error-color
-                 :padding [0 4 0 0]}]]]))
+  (reset! *theme-colors
+          {:secondary   (get-theme-color ctx :text-color-secondary)
+           :error-color (get-theme-color ctx :color-error)})
+  (let [subtitle-color (get-theme-color ctx :text-color-secondary)]
+    [:scroll-view {:id section-id
+                   :layout-width :fill
+                   :layout-height :fill
+                   :visibility :gone}
+     [:linear-layout {:orientation :vertical
+                      :padding [16 16 16 16]
+                      :layout-width :match-parent}
+      [:text-view {:text "nREPL Server"
+                   :text-size [22 :sp]
+                   :padding [0 0 0 8]}]
+      [:text-view {:text "Connect from your editor to live-reload code."
+                   :text-size [14 :sp]
+                   :text-color subtitle-color
+                   :padding [0 0 0 16]}]
+      [:linear-layout {:orientation :horizontal}
+       [:text-view {:text "Port: "
+                    :text-size [16 :sp]
+                    :padding [0 8 8 0]}]
+       [:edit-text {:id ::nrepl-port-input
+                    :text "7888"
+                    :input-type :number}]]
+      [:text-view {:id ::nrepl-status
+                   :text *status-text
+                   :text-size [16 :sp]
+                   :text-color *status-color
+                   :padding [0 4 0 4]}]
+      [:linear-layout {:orientation :horizontal
+                       :padding [0 4 0 4]}
+       [:button {:id ::nrepl-start-btn
+                 :text "Start"
+                 :enabled *start-enabled
+                 :on-click on-start-nrepl}]
+       [:button {:id ::nrepl-stop-btn
+                 :text "Stop"
+                 :enabled *stop-enabled
+                 :on-click on-stop-nrepl}]]
+      [:text-view {:id ::nrepl-error
+                   :text *error-text
+                   :text-size [14 :sp]
+                   :text-color *status-color
+                   :padding [0 4 0 0]}]]]))

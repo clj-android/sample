@@ -149,7 +149,6 @@
   (let [root (ui/make-ui activity @*ui-tree)]
     (reset! *root-view root)
     (repl-ui/init! activity root)
-    (repl-ui/sync-status!)
     root))
 
 (defn on-create
