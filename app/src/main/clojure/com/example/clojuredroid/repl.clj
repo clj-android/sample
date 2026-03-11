@@ -66,15 +66,27 @@
 (defonce ^:private _auto-start-watcher
   (doto (Thread.
           (fn []
-            (if-not (repl-server/repl-available?)
+            (cond
+              ;; Server already running: autoStartNrepl may have completed before
+              ;; this namespace loaded.  Reflect reality immediately.
+              (repl-server/running?)
+              (reset! *state {:status :running
+                              :port   (or (repl-server/port) 7888)
+                              :error  nil})
+
+              ;; nREPL infrastructure not bundled (release build or runtime-repl
+              ;; excluded).  Nothing will start it.
+              (not (repl-server/repl-available?))
               (reset! *state {:status :unavailable :port nil :error nil})
+
+              ;; Wait for autoStartNrepl to bring the server up.
+              :else
               (do
-                (when-not (repl-server/running?)
-                  (reset! *state {:status :starting :port nil :error nil}))
+                (reset! *state {:status :starting :port nil :error nil})
                 (if (repl-server/wait-for-ready :timeout-ms 60000)
-                  (reset! *state {:status  :running
-                                  :port    (or (repl-server/port) 7888)
-                                  :error   nil})
+                  (reset! *state {:status :running
+                                  :port   (or (repl-server/port) 7888)
+                                  :error  nil})
                   (when-not (repl-server/running?)
                     (reset! *state {:status :stopped :port nil :error nil}))))))
           "nrepl-auto-start-watcher")
