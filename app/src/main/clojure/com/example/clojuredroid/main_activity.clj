@@ -12,10 +12,9 @@
     (require '[com.example.clojuredroid.main-activity :as ui])
     (ui/reload-ui!)"
   (:require [neko.ui :as ui]
-            [neko.find-view :refer [find-view]]
             [neko.ui.support.drawer-layout]
             [neko.ui.support.material]
-            [neko.threading :refer [on-ui]]
+            [neko.ui.support.window-insets :as wini]
             [com.example.clojuredroid.demos.widgets :as widgets]
             [com.example.clojuredroid.demos.lists :as lists]
             [com.example.clojuredroid.demos.material :as material]
@@ -62,11 +61,11 @@
          [:linear-layout {:orientation :vertical
                           :layout-width :fill
                           :layout-height :fill}
-          ;; Header bar — top padding set in on-create to account for status bar
-          [:linear-layout {:id ::header
+           [:linear-layout {:id ::header
                            :orientation :horizontal
                            :background-color 0xFF6200EE
                            :padding [4 8 16 8]
+                           :insets-padding :top
                            :layout-width :fill
                            :gravity :center-vertical}
            [:button {:text "\u2630"
@@ -116,32 +115,12 @@
     (reset! *root-view root)
     root))
 
-(defn- status-bar-height
-  "Returns the status bar height in pixels."
-  [^Activity activity]
-  (let [res (.getResources activity)
-        id  (.getIdentifier res "status_bar_height" "dimen" "android")]
-    (if (pos? id) (.getDimensionPixelSize res id) 0)))
-
-(defn set-status-bar! [^Activity activity]
-  (let [sb-height (status-bar-height activity)]
-      (when-let [^View header (find-view @*root-view ::header)]
-        (on-ui
-         (.setPadding header
-                      (.getPaddingLeft header)
-                      (+ (.getPaddingTop header) sb-height)
-                      (.getPaddingRight header)
-                      (.getPaddingBottom header))))))
-
 (defn on-create
   "Called automatically by ClojureActivity when the activity is created."
   [^Activity activity saved-instance-state]
+  (wini/enable-edge-to-edge! activity)
   (let [^View root (make-ui activity)]
     (.setContentView activity ^View root)
-    ;; Match status bar color to header and add inset padding
-    (.. activity getWindow (setStatusBarColor (unchecked-int 0xFF6200EE)))
-    (set-status-bar! activity)
-    ;; Initialize sub-namespaces
     (repl-ui/init! activity root)
     (widgets/init! root activity)))
 
@@ -150,8 +129,7 @@
   []
   (when-let [activity (ClojureActivity/getInstance
                         "com.example.clojuredroid.main-activity")]
-    (.reloadUi ^ClojureActivity activity)
-    (set-status-bar! activity)))
+    (.reloadUi ^ClojureActivity activity)))
 
 ;; Sync nREPL status when UI reloads
 (add-watch *ui-tree :nrepl-status-watch
