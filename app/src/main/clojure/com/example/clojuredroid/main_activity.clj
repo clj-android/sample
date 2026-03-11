@@ -73,9 +73,12 @@
 
 (defonce *ui-tree (atom []))
 
+(declare reload-ui!)
+
 (defn rebuild-ui-tree!
-  "Rebuilds *ui-tree from the current theme and section UIs.
-  Call from the REPL to pick up theme or UI changes:
+  "Rebuilds *ui-tree from the current theme and section UIs, then
+  hot-reloads the live view. Call from the REPL after redefining this
+  function to pick up structural or theme changes:
     (rebuild-ui-tree!)"
   []
   (vreset! building? true)
@@ -136,13 +139,13 @@
                      :layout-width :fill
                      :layout-height [1 :dp]}]]
             (map nav-item sections))]])
-  (vreset! building? false))
+  (vreset! building? false)
+  (reload-ui!))
 
 (defn make-ui
-  "Builds the UI tree using neko's declarative DSL."
+  "Renders @*ui-tree into a live view. Called by ClojureActivity.reloadUi."
   [^Activity activity]
   (reset! *activity activity)
-  (rebuild-ui-tree!)
   (let [root (ui/make-ui activity @*ui-tree)]
     (reset! *root-view root)
     (repl-ui/init! activity root)
@@ -152,8 +155,8 @@
   "Called automatically by ClojureActivity when the activity is created."
   [^Activity activity saved-instance-state]
   (wini/enable-edge-to-edge! activity)
-  (let [^View root (make-ui activity)]
-    (.setContentView activity ^View root)))
+  (reset! *activity activity)
+  (rebuild-ui-tree!))
 
 (defn reload-ui!
   "Hot-reload the UI from the REPL."
