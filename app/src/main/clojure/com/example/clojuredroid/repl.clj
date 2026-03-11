@@ -5,7 +5,8 @@
   to set references for UI updates."
   (:require [neko.find-view :refer [find-view]]
             [neko.resource :refer [get-theme-color]]
-            [clj-android.repl.server :as repl-server])
+            [clj-android.repl.server :as repl-server]
+            [neko.threading :refer [on-ui]])
   (:import android.app.Activity
            android.widget.EditText
            android.widget.TextView))
@@ -22,25 +23,21 @@
 
 ;; --- UI helpers ---
 
-(defn- run-on-ui! [f]
-  (when-let [^Activity activity @*activity]
-    (.runOnUiThread activity f)))
-
 (defn- set-status! [text color]
-  (run-on-ui!
+  (on-ui
     (fn []
       (when-let [^TextView v (find-view @*root-view ::nrepl-status)]
         (.setText v (str text))
         (.setTextColor v (unchecked-int color))))))
 
 (defn- set-error! [text]
-  (run-on-ui!
+  (on-ui
     (fn []
       (when-let [^TextView v (find-view @*root-view ::nrepl-error)]
         (.setText v (str text))))))
 
 (defn- set-buttons! [start-enabled? stop-enabled?]
-  (run-on-ui!
+  (on-ui
     (fn []
       (when-let [^android.view.View v (find-view @*root-view ::nrepl-start-btn)]
         (.setEnabled v (boolean start-enabled?)))
