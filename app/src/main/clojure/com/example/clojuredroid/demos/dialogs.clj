@@ -7,7 +7,7 @@
   (:import android.content.DialogInterface
            android.view.View))
 
-(def dialog-result** (cell "None"))
+(def dialog-result* (cell "None"))
 
 (defn section-ui
   "Returns the Dialogs & Toasts demo section UI tree.
