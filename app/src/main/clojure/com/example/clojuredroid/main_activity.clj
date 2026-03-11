@@ -149,6 +149,7 @@
   (let [root (ui/make-ui activity @*ui-tree)]
     (reset! *root-view root)
     (repl-ui/init! activity root)
+    (repl-ui/sync-status!)
     root))
 
 (defn on-create
@@ -170,5 +171,4 @@
 (add-watch *ui-tree :reload
            (fn [_ _ _ _]
              (when-not @building?
-               (repl-ui/sync-status!)
                (reload-ui!))))
