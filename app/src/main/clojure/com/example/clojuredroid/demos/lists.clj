@@ -5,9 +5,9 @@
             [neko.ui.support.adapters]
             [neko.resource :refer [get-theme-color]]))
 
-(def items (atom ["Apple" "Banana" "Cherry" "Date" "Elderberry"]))
-(def item-count= (cell= #(str (count @items) " items")))
-(def next-num (atom 5))
+(def items* (atom ["Apple" "Banana" "Cherry" "Date" "Elderberry"]))
+(def item-count= (cell= #(str (count @items*) " items")))
+(def next-num* (atom 5))
 
 (defn section-ui
   "Returns the Lists demo section UI tree.
@@ -34,23 +34,23 @@
                      :padding [0 4 0 8]}
      [:button {:text "Add Item"
                :on-click (fn [_]
-                           (swap! next-num inc)
-                           (swap! items conj (str "Item " @next-num)))}]
+                           (swap! next-num* inc)
+                           (swap! items* conj (str "Item " @next-num*)))}]
      [:button {:text "Remove Last"
                :on-click (fn [_]
-                           (when (seq @items)
-                             (swap! items (comp vec butlast))))}]
+                           (when (seq @items*)
+                             (swap! items* (comp vec butlast))))}]
      [:button {:text "Reset"
                :on-click (fn [_]
-                           (reset! next-num 5)
-                           (reset! items ["Apple" "Banana" "Cherry"
+                           (reset! next-num* 5)
+                           (reset! items* ["Apple" "Banana" "Cherry"
                                           "Date" "Elderberry"]))}]]]
    ;; RecyclerView fills remaining space (no outer ScrollView needed)
    [:recycler-view {:layout-manager :linear
                     :layout-width :fill
                     :layout-height 0
                     :layout-weight 1
-                    :items items
+                    :items items*
                     :item-view (fn [data pos]
                                  [:linear-layout {:orientation :horizontal
                                                   :padding [16 12 16 12]

@@ -3,8 +3,8 @@
   (:require [neko.reactive :refer [cell cell=]]
             [neko.resource :refer [get-theme-color]]))
 
-(def text-mirror (cell ""))
-(def char-count (cell 0))
+(def text-mirror* (cell ""))
+(def char-count* (cell 0))
 
 (defn section-ui
   "Returns the Forms demo section UI tree.
@@ -26,11 +26,11 @@
     [:edit-text {:hint "Type here to see live updates..."
                  :layout-width :fill
                  :on-text-change (fn [text]
-                                   (reset! text-mirror text)
-                                   (reset! char-count (count text)))}]
-    [:text-view {:text (cell= #(str "Mirror: " @text-mirror))
+                                   (reset! text-mirror* text)
+                                   (reset! char-count* (count text)))}]
+    [:text-view {:text (cell= #(str "Mirror: " @text-mirror*))
                  :padding [0 4 0 0]}]
-    [:text-view {:text (cell= #(str "Characters: " @char-count))
+    [:text-view {:text (cell= #(str "Characters: " @char-count*))
                  :text-size [13 :sp]
                  :text-color caption-color
                  :padding [0 2 0 16]}]
