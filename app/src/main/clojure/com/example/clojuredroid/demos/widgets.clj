@@ -2,7 +2,6 @@
   "Basic widget demos: counter, checkbox, seek-bar, switch, toggle-button,
   radio-group, spinner, image-view, and horizontal-scroll-view."
   (:require [neko.reactive :refer [cell cell=]]
-            [neko.find-view :refer [find-view]]
             [neko.resource :refer [get-theme-color]])
   (:import android.widget.ArrayAdapter
            android.widget.Spinner))
@@ -16,15 +15,6 @@
 (def selected-radio (cell "None"))
 (def spinner-items ["Red" "Green" "Blue" "Yellow" "Purple"])
 (def spinner-selection (cell (first spinner-items)))
-
-(defn init!
-  "Called after make-ui to set up the Spinner adapter."
-  [root-view ^android.content.Context context]
-  (when-let [^Spinner spinner (find-view root-view ::spinner)]
-    (let [adapter (ArrayAdapter. context
-                    android.R$layout/simple_spinner_dropdown_item
-                    ^java.util.List (java.util.ArrayList. ^java.util.Collection spinner-items))]
-      (.setAdapter spinner adapter))))
 
 (defn section-ui
   "Returns the Widgets demo section UI tree.
@@ -134,6 +124,11 @@
                  :text-color caption-color
                  :padding [0 2 0 4]}]
     [:spinner {:id ::spinner
+               :on-create (fn [^Spinner spinner]
+                            (.setAdapter spinner
+                              (ArrayAdapter. (.getContext spinner)
+                                android.R$layout/simple_spinner_dropdown_item
+                                ^java.util.List (java.util.ArrayList. ^java.util.Collection spinner-items))))
                :on-item-selected (fn [_ _ pos _]
                                    (reset! spinner-selection
                                            (nth spinner-items pos)))}]

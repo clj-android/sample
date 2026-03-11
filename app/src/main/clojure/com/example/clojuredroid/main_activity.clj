@@ -142,6 +142,7 @@
   (rebuild-ui-tree!)
   (let [root (ui/make-ui activity @*ui-tree)]
     (reset! *root-view root)
+    (repl-ui/init! activity root)
     root))
 
 (defn on-create
@@ -149,9 +150,7 @@
   [^Activity activity saved-instance-state]
   (wini/enable-edge-to-edge! activity)
   (let [^View root (make-ui activity)]
-    (.setContentView activity ^View root)
-    (repl-ui/init! activity root)
-    (widgets/init! root activity)))
+    (.setContentView activity ^View root)))
 
 (defn reload-ui!
   "Hot-reload the UI from the REPL."
