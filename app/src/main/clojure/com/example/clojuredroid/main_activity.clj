@@ -10,6 +10,12 @@
   To modify the UI live from the REPL:
 
     (require '[com.example.clojuredroid.main-activity :as ui])
+
+    ;; Rebuild with current theme colors and reload:
+    (ui/rebuild-ui-tree!)
+
+    ;; Or set an arbitrary tree and reload:
+    (reset! ui/*ui-tree [...])
     (ui/reload-ui!)"
   (:require [neko.ui :as ui]
             [neko.ui.support.drawer-layout]
@@ -49,18 +55,29 @@
                :padding [24 14 24 14]
                :nav-for section-id}])
 
+;; Theme color helper.
+;;
+;; Reads from @*activity at call time, so colors are always current.
+;; Using functions (rather than atoms) means theme changes take effect
+;; automatically: when the user toggles dark/light mode, Android recreates
+;; the Activity, make-ui resets *activity, and the next rebuild-ui-tree! call
+;; gets fresh colors without any explicit invalidation.
+(defn- tc [kw] (res/get-theme-color @*activity kw))
+
+;; Guard: when rebuild-ui-tree! does its internal reset!, we don't want the
+;; :reload watch to fire (that would cause make-ui → rebuild → watch → loop).
+;; External resets (e.g. from the REPL) still trigger reload normally.
+(defonce ^:private building? (volatile! false))
+
 (defonce *ui-tree (atom []))
 
-(defn- build-ui-tree
-  "Builds the full UI tree using theme colors from the given Activity."
-  [^Activity activity]
-  (let [primary         (res/get-theme-color activity :color-primary)
-        on-primary      (res/get-theme-color activity :color-on-primary)
-        surface         (res/get-theme-color activity :color-surface)
-        on-surface      (res/get-theme-color activity :color-on-surface)
-        ;; Divider: on-surface color at 12% alpha (Material 2 spec for dividers)
-        divider-color   (bit-or (bit-and (res/get-theme-color activity :color-on-surface) 0x00FFFFFF)
-                                0x1F000000)]
+(defn rebuild-ui-tree!
+  "Rebuilds *ui-tree from the current theme and section UIs.
+  Call from the REPL to pick up theme or UI changes:
+    (rebuild-ui-tree!)"
+  []
+  (vreset! building? true)
+  (reset! *ui-tree
     [:drawer-layout {:id ::drawer
                      :id-holder true
                      :layout-width :fill
@@ -73,54 +90,57 @@
                       :layout-height :fill}
       [:linear-layout {:id ::header
                        :orientation :horizontal
-                       :background-color primary
+                       :background-color (tc :color-primary)
                        :padding [4 8 16 8]
                        :insets-padding :top
                        :layout-width :fill
                        :gravity :center-vertical}
        [:button {:text "\u2630"
                  :text-size [22 :sp]
-                 :text-color on-primary
-                 :background-color primary
+                 :text-color (tc :color-on-primary)
+                 :background-color (tc :color-primary)
                  :min-width [48 :dp]
                  :opens-drawer true}]
        [:text-view {:id ::header-title
                     :text "Widgets"
                     :text-size [20 :sp]
-                    :text-color on-primary
+                    :text-color (tc :color-on-primary)
                     :padding [4 0 0 0]}]]
       ;; Section container
       [:frame-layout {:layout-width :fill
                       :layout-height 0
                       :layout-weight 1}
-       (widgets/section-ui activity ::widgets)
-       (lists/section-ui activity ::lists)
-       (material/section-ui activity ::material)
-       (forms/section-ui activity ::forms)
-       (dialogs/section-ui activity ::dialogs)
-       (repl-ui/section-ui activity ::repl)]]
+       (widgets/section-ui @*activity ::widgets)
+       (lists/section-ui @*activity ::lists)
+       (material/section-ui @*activity ::material)
+       (forms/section-ui @*activity ::forms)
+       (dialogs/section-ui @*activity ::dialogs)
+       (repl-ui/section-ui @*activity ::repl)]]
      ;; === Drawer (second child, layout-gravity :start) ===
      [:scroll-view {:layout-width [280 :dp]
                     :layout-height :fill
                     :layout-gravity :start
-                    :background-color surface}
+                    :background-color (tc :color-surface)}
       (into [:linear-layout {:orientation :vertical
                              :padding [0 24 0 0]}
              [:text-view {:text "Neko Demos"
                           :text-size [22 :sp]
-                          :text-color on-surface
+                          :text-color (tc :color-on-surface)
                           :padding [24 16 24 20]}]
-             [:view {:background-color divider-color
+             ;; Divider: on-surface at 12% alpha (Material 2 spec)
+             [:view {:background-color (bit-or (bit-and (tc :color-on-surface) 0x00FFFFFF)
+                                               0x1F000000)
                      :layout-width :fill
                      :layout-height [1 :dp]}]]
-            (map nav-item sections))]]))
+            (map nav-item sections))]])
+  (vreset! building? false))
 
 (defn make-ui
   "Builds the UI tree using neko's declarative DSL."
   [^Activity activity]
   (reset! *activity activity)
-  (let [tree (build-ui-tree activity)
-        root (ui/make-ui activity tree)]
+  (rebuild-ui-tree!)
+  (let [root (ui/make-ui activity @*ui-tree)]
     (reset! *root-view root)
     root))
 
@@ -140,11 +160,10 @@
                         "com.example.clojuredroid.main-activity")]
     (.reloadUi ^ClojureActivity activity)))
 
-;; Sync nREPL status when UI reloads
-(add-watch *ui-tree :nrepl-status-watch
-           (fn [_key _ref _old _new]
-             (repl-ui/sync-status!)))
-
-(add-watch *ui-tree :nrepl-status-watch
-           (fn [_key _ref _old _new]
-             (reload-ui!)))
+;; REPL hot-reload: (reset! *ui-tree [...]) triggers a live reload.
+;; Internal rebuilds via rebuild-ui-tree! set building? and are ignored.
+(add-watch *ui-tree :reload
+           (fn [_ _ _ _]
+             (when-not @building?
+               (repl-ui/sync-status!)
+               (reload-ui!))))
