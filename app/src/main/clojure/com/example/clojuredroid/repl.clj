@@ -64,33 +64,30 @@
 ;; ---------------------------------------------------------------------------
 
 (defonce ^:private _auto-start-watcher
-  (doto (Thread.
-          (fn []
-            (cond
-              ;; Server already running: autoStartNrepl may have completed before
-              ;; this namespace loaded.  Reflect reality immediately.
-              (repl-server/running?)
-              (reset! state* {:status :running
-                              :port   (or (repl-server/port) 7888)
-                              :error  nil})
+  (future
+    (cond
+      ;; Server already running: autoStartNrepl may have completed before
+      ;; this namespace loaded.  Reflect reality immediately.
+      (repl-server/running?)
+      (reset! state* {:status :running
+                      :port   (or (repl-server/port) 7888)
+                      :error  nil})
 
-              ;; nREPL infrastructure not bundled (release build or runtime-repl
-              ;; excluded).  Nothing will start it.
-              (not (repl-server/repl-available?))
-              (reset! state* {:status :unavailable :port nil :error nil})
+      ;; nREPL infrastructure not bundled (release build or runtime-repl
+      ;; excluded).  Nothing will start it.
+      (not (repl-server/repl-available?))
+      (reset! state* {:status :unavailable :port nil :error nil})
 
-              ;; Wait for autoStartNrepl to bring the server up.
-              :else
-              (do
-                (reset! state* {:status :starting :port nil :error nil})
-                (if (repl-server/wait-for-ready :timeout-ms 60000)
-                  (reset! state* {:status :running
-                                  :port   (or (repl-server/port) 7888)
-                                  :error  nil})
-                  (when-not (repl-server/running?)
-                    (reset! state* {:status :stopped :port nil :error nil}))))))
-          "nrepl-auto-start-watcher")
-    .start))
+      ;; Wait for autoStartNrepl to bring the server up.
+      :else
+      (do
+        (reset! state* {:status :starting :port nil :error nil})
+        (if (repl-server/wait-for-ready :timeout-ms 60000)
+          (reset! state* {:status :running
+                          :port   (or (repl-server/port) 7888)
+                          :error  nil})
+          (when-not (repl-server/running?)
+            (reset! state* {:status :stopped :port nil :error nil})))))))
 
 ;; ---------------------------------------------------------------------------
 ;; Init (called from make-ui after each view rebuild)
@@ -136,17 +133,14 @@
 
 (defn- on-stop-nrepl [_view]
   (reset! state* {:status :stopping :port nil :error nil})
-  (.start
-    (Thread.
-      (fn []
-        (try
-          (repl-server/stop)
-          (reset! state* {:status :stopped :port nil :error nil})
-          (catch Throwable t
-            (reset! state* {:status :error
-                            :port   nil
-                            :error  (.getMessage t)}))))
-      "nrepl-stop")))
+  (future
+    (try
+      (repl-server/stop)
+      (reset! state* {:status :stopped :port nil :error nil})
+      (catch Throwable t
+        (reset! state* {:status :error
+                        :port   nil
+                        :error  (.getMessage t)})))))
 
 ;; ---------------------------------------------------------------------------
 ;; Section UI
