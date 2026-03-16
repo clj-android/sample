@@ -56,7 +56,7 @@
   `ctx` is an Android Context used to resolve theme colors."
   [ctx section-id]
   (let [label-color (get-theme-color ctx :text-color-secondary)
-        neko-url    "https://github.com/niclasberg/neko"]
+        neko-url    "https://github.com/clj-android/neko"]
     [:scroll-view {:id section-id
                    :layout-width :fill
                    :layout-height :fill
