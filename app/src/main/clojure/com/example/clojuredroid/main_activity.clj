@@ -28,6 +28,7 @@
             [com.example.clojuredroid.demos.forms :as forms]
             [com.example.clojuredroid.demos.dialogs :as dialogs]
             [com.example.clojuredroid.demos.sensors :as sensors]
+            [com.example.clojuredroid.demos.intents :as intents]
             [com.example.clojuredroid.repl :as repl-ui])
   (:import android.app.Activity
            android.view.View
@@ -44,6 +45,7 @@
    [::forms    "Forms & Input"       forms/section-ui]
    [::dialogs  "Dialogs & Toasts"    dialogs/section-ui]
    [::sensors  "Sensors"             sensors/section-ui]
+   [::intents  "Intents"             intents/section-ui]
    [::repl     "nREPL"               repl-ui/section-ui]])
 
 (defn- drawer-content-spec []
@@ -121,6 +123,7 @@
        (forms/section-ui @activity* ::forms)
        (dialogs/section-ui @activity* ::dialogs)
        (sensors/section-ui @activity* ::sensors)
+       (intents/section-ui @activity* ::intents)
        (repl-ui/section-ui @activity* ::repl)]]
      ;; === Drawer (second child, layout-gravity :start) ===
      [:scroll-view {:layout-width [280 :dp]
