@@ -28,6 +28,7 @@
             [com.example.clojuredroid.demos.forms :as forms]
             [com.example.clojuredroid.demos.dialogs :as dialogs]
             [com.example.clojuredroid.demos.sensors :as sensors]
+            [com.example.clojuredroid.demos.inertial-nav :as inertial]
             [com.example.clojuredroid.demos.intents :as intents]
             [com.example.clojuredroid.repl :as repl-ui])
   (:import android.app.Activity
@@ -45,6 +46,7 @@
    [::forms    "Forms & Input"       forms/section-ui]
    [::dialogs  "Dialogs & Toasts"    dialogs/section-ui]
    [::sensors  "Sensors"             sensors/section-ui]
+   [::inertial "Inertial Nav"       inertial/section-ui]
    [::intents  "Intents"             intents/section-ui]
    [::repl     "nREPL"               repl-ui/section-ui]])
 
@@ -123,6 +125,7 @@
        (forms/section-ui @activity* ::forms)
        (dialogs/section-ui @activity* ::dialogs)
        (sensors/section-ui @activity* ::sensors)
+       (inertial/section-ui @activity* ::inertial)
        (intents/section-ui @activity* ::intents)
        (repl-ui/section-ui @activity* ::repl)]]
      ;; === Drawer (second child, layout-gravity :start) ===
