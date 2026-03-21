@@ -59,6 +59,25 @@ fun propagateLocalProperties(dir: java.io.File) {
  */
 fun ensureDep(name: String): java.io.File? {
     val dir = java.io.File(depsDir, name)
+
+    // Prefer a sibling directory in the parent (monorepo layout).
+    // If ../name exists and has a build file, symlink it into build/deps/
+    // so the local working copy is used instead of an auto-clone.
+    val siblingDir = file("../$name")
+    if (siblingDir.isDirectory && java.io.File(siblingDir, "build.gradle.kts").isFile) {
+        if (!dir.exists() || (isShallowClone(dir) && !java.nio.file.Files.isSymbolicLink(dir.toPath()))) {
+            // Replace auto-clone with symlink to sibling
+            if (dir.exists()) dir.deleteRecursively()
+            depsDir.mkdirs()
+            java.nio.file.Files.createSymbolicLink(dir.toPath(), siblingDir.toPath())
+            println("Using local sibling: $name -> ${siblingDir.absolutePath}")
+        }
+        if (java.nio.file.Files.isSymbolicLink(dir.toPath())) {
+            propagateLocalProperties(dir)
+            return dir
+        }
+    }
+
     val hasBuildFile = java.io.File(dir, "build.gradle.kts").isFile
 
     if (hasBuildFile && isShallowClone(dir)) {
