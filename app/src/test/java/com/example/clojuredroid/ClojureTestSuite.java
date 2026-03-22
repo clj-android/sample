@@ -8,10 +8,13 @@ import org.robolectric.annotation.Config;
 import clojure.java.api.Clojure;
 import clojure.lang.IFn;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 /**
  * JUnit bridge that runs Clojure test namespaces under Robolectric.
+ *
+ * clojure.test output prints to stdout; Gradle's testLogging config
+ * ensures it appears in the console on failure.
  */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 35)
@@ -41,19 +44,19 @@ public class ClojureTestSuite {
         IFn eval = Clojure.var("clojure.core", "eval");
         IFn readString = Clojure.var("clojure.core", "read-string");
 
+        // Run tests with output going to stdout (captured by Gradle).
+        // Return only the fail+error count as a plain number.
         StringBuilder sb = new StringBuilder();
-        sb.append("(let [sw (java.io.StringWriter.)");
-        sb.append("      result (binding [*out* sw] (clojure.test/run-tests");
+        sb.append("(let [result (clojure.test/run-tests");
         for (String ns : TEST_NAMESPACES) {
             sb.append(" '").append(ns);
         }
-        sb.append("))");
-        sb.append("      output (str sw)");
-        sb.append("      fails (+ (:fail result) (:error result))]");
-        sb.append("  (when (pos? fails) (println output))");
-        sb.append("  fails)");
+        sb.append(")] (+ (:fail result) (:error result)))");
 
         Object failCount = eval.invoke(readString.invoke(sb.toString()));
-        assertEquals("Clojure test failures/errors", 0L, ((Number) failCount).longValue());
+        long fails = ((Number) failCount).longValue();
+        if (fails > 0) {
+            fail(fails + " clojure.test failure(s) — see test output above");
+        }
     }
 }
