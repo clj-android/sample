@@ -263,7 +263,7 @@
                    :padding [0 12 0 8]}]
       [:scroll-view {:id ::repl-scroll
                      :layout-width :fill
-                     :layout-height 200
+                     :layout-height 400
                      :on-create (fn [^ScrollView v]
                                   (.setBackgroundColor v (unchecked-int 0xFF1A1A2E)))}
        [:text-view {:id ::repl-output
