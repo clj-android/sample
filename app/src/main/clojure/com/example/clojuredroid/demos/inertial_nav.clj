@@ -503,7 +503,11 @@
         [:text-view {:text "This demo requires both an accelerometer and a gyroscope."
                      :text-size [16 :sp] :text-color lc}]]
        [:linear-layout {:orientation :vertical :padding [16 16 16 16] :layout-width :match-parent}
-
+        [:text-view {:text "Inertial navigation demo"
+                    :text-size [18 :sp]}]
+        [:text-view {:text "Probably not accurate enough for any useful purpose"
+                    :text-size [14 :sp]}]
+        [:linear-layout {:min-height [24 :sp]}]
         ;; Status
         [:text-view {:text (cell= #(deref status*))
                      :text-size [14 :sp] :text-color lc :padding [0 0 0 8]}]
