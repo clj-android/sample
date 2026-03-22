@@ -46,7 +46,7 @@
 
 ;; ── Quaternion [w x y z] ─────────────────────────────────────────────────────
 
-(defn- qmul [[w1 x1 y1 z1] [w2 x2 y2 z2]]
+(defn qmul [[w1 x1 y1 z1] [w2 x2 y2 z2]]
   (let [w1 (double w1) x1 (double x1) y1 (double y1) z1 (double z1)
         w2 (double w2) x2 (double x2) y2 (double y2) z2 (double z2)]
     [(- (* w1 w2) (* x1 x2) (* y1 y2) (* z1 z2))
@@ -54,12 +54,12 @@
      (+ (* w1 y2) (- (* x1 z2)) (* y1 w2) (* z1 x2))
      (+ (* w1 z2) (* x1 y2) (- (* y1 x2)) (* z1 w2))]))
 
-(defn- qnorm [[w x y z]]
+(defn qnorm [[w x y z]]
   (let [w (double w) x (double x) y (double y) z (double z)
         n (Math/sqrt (+ (* w w) (* x x) (* y y) (* z z)))]
     (if (> n 1e-10) [(/ w n) (/ x n) (/ y n) (/ z n)] [1.0 0.0 0.0 0.0])))
 
-(defn- qrot
+(defn qrot
   "Rotate vector by quaternion using Rodrigues formula."
   [[qw qx qy qz] [vx vy vz]]
   (let [qw (double qw) qx (double qx) qy (double qy) qz (double qz)
@@ -71,7 +71,7 @@
      (+ vy (* qw ty) (- (* qz tx) (* qx tz)))
      (+ vz (* qw tz) (- (* qx ty) (* qy tx)))]))
 
-(defn- rv->q
+(defn rv->q
   "Rotation vector → quaternion."
   [[tx ty tz]]
   (let [tx (double tx) ty (double ty) tz (double tz)
@@ -80,7 +80,7 @@
       (let [ha (/ a 2.0) s (/ (Math/sin ha) a)]
         (qnorm [(Math/cos ha) (* tx s) (* ty s) (* tz s)])))))
 
-(defn- gravity->q
+(defn gravity->q
   "Quaternion aligning device gravity reading (at rest) with world Z-up."
   [accel]
   (let [[ax ay az] accel
@@ -97,40 +97,40 @@
 
 ;; ── 3-vector ops ─────────────────────────────────────────────────────────────
 
-(defn- vmag ^double [[x y z]]
+(defn vmag ^double [[x y z]]
   (let [x (double x) y (double y) z (double z)]
     (Math/sqrt (+ (* x x) (* y y) (* z z)))))
 
-(defn- vadd [[ax ay az] [bx by bz]]
+(defn vadd [[ax ay az] [bx by bz]]
   [(+ (double ax) (double bx)) (+ (double ay) (double by)) (+ (double az) (double bz))])
 
-(defn- vsub [[ax ay az] [bx by bz]]
+(defn vsub [[ax ay az] [bx by bz]]
   [(- (double ax) (double bx)) (- (double ay) (double by)) (- (double az) (double bz))])
 
-(defn- vscale [[x y z] ^double s]
+(defn vscale [[x y z] ^double s]
   [(* (double x) s) (* (double y) s) (* (double z) s)])
 
-(defn- vcross [[ax ay az] [bx by bz]]
+(defn vcross [[ax ay az] [bx by bz]]
   (let [ax (double ax) ay (double ay) az (double az)
         bx (double bx) by (double by) bz (double bz)]
     [(- (* ay bz) (* az by)) (- (* az bx) (* ax bz)) (- (* ax by) (* ay bx))]))
 
 ;; ── N×N matrix ops (flat row-major double[]) ─────────────────────────────────
 
-(defn- mz ^doubles [^long n] (double-array (* n n)))
+(defn mz ^doubles [^long n] (double-array (* n n)))
 
-(defn- mi ^doubles [^long n]
+(defn mi ^doubles [^long n]
   (let [^doubles m (mz n)] (dotimes [i n] (aset m (+ (* i n) i) 1.0)) m))
 
-(defn- mget ^double [^doubles m ^long n ^long i ^long j]
+(defn mget ^double [^doubles m ^long n ^long i ^long j]
   (aget m (+ (* i n) j)))
 
-(defn- mset
+(defn mset
   "Set element (i,j) of n×n matrix. No primitive hints on args (Clojure 4-arg limit)."
   [^doubles m n i j v]
   (aset m (int (+ (* (int n) (int i)) (int j))) (double v)))
 
-(defn- mm
+(defn mm
   "Multiply two n×n matrices."
   ^doubles [^doubles a ^doubles b ^long n]
   (let [^doubles c (mz n)]
@@ -141,20 +141,20 @@
           (aset c (+ (* i n) j) s)))))
     c))
 
-(defn- mt ^doubles [^doubles m ^long n]
+(defn mt ^doubles [^doubles m ^long n]
   (let [^doubles t (mz n)]
     (dotimes [i n] (dotimes [j n] (aset t (+ (* j n) i) (aget m (+ (* i n) j)))))
     t))
 
-(defn- madd ^doubles [^doubles a ^doubles b ^long n]
+(defn madd ^doubles [^doubles a ^doubles b ^long n]
   (let [nn (* n n) ^doubles c (double-array nn)]
     (dotimes [i nn] (aset c i (+ (aget a i) (aget b i)))) c))
 
-(defn- msub ^doubles [^doubles a ^doubles b ^long n]
+(defn msub ^doubles [^doubles a ^doubles b ^long n]
   (let [nn (* n n) ^doubles c (double-array nn)]
     (dotimes [i nn] (aset c i (- (aget a i) (aget b i)))) c))
 
-(defn- inv3
+(defn inv3
   "Invert a 3×3 matrix; nil if singular."
   ^doubles [^doubles m]
   (let [a (aget m 0) b (aget m 1) c (aget m 2)

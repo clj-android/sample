@@ -11,7 +11,7 @@
 
 (def file-info* (cell nil))
 
-(defn- format-size [bytes]
+(defn format-size [bytes]
   (cond
     (nil? bytes)       "unknown"
     (< bytes 1024)     (str bytes " B")
