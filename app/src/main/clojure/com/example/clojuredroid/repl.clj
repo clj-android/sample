@@ -1,13 +1,15 @@
 (ns com.example.clojuredroid.repl
-  "nREPL server controls for the sample app.
+  "nREPL server controls and local REPL for the sample app.
 
-  State is held in a reactive cell (state*) so the UI always reflects the
+  State is held in reactive cells so the UI always reflects the
   true server state, regardless of when the view is built or rebuilt."
   (:require [neko.find-view :refer [find-view]]
             [neko.resource :refer [get-theme-color]]
             [neko.reactive :refer [cell cell=]]
+            [neko.threading :refer [on-ui]]
             [clj-android.repl.server :as repl-server])
-  (:import android.widget.EditText))
+  (:import [android.graphics Typeface]
+           [android.widget EditText ScrollView TextView]))
 
 ;; ---------------------------------------------------------------------------
 ;; State cells (defonce — survive UI rebuilds)
@@ -52,6 +54,21 @@
 
 (defonce stop-enabled=
   (cell= #(= :running (:status @state*))))
+
+;; ---------------------------------------------------------------------------
+;; Local REPL state
+;; ---------------------------------------------------------------------------
+
+(defonce repl-output* (cell ""))
+(defonce repl-evaluating?* (cell false))
+
+(defonce eval-btn-enabled=
+  (cell= #(and (not @repl-evaluating?*) (= :running (:status @state*)))))
+
+(defonce repl-hint=
+  (cell= #(if (= :running (:status @state*))
+            "Type Clojure code here..."
+            "Start nREPL server first")))
 
 ;; ---------------------------------------------------------------------------
 ;; Root-view reference (for reading the port input field)
@@ -143,6 +160,46 @@
                         :error  (.getMessage t)})))))
 
 ;; ---------------------------------------------------------------------------
+;; Local REPL eval
+;; ---------------------------------------------------------------------------
+
+(defn- append-output! [text]
+  (swap! repl-output* str text))
+
+(defn- scroll-to-bottom! []
+  (when-let [root @root-view*]
+    (when-let [^ScrollView sv (find-view root ::repl-scroll)]
+      (on-ui (.post sv (fn [] (.fullScroll sv android.view.View/FOCUS_DOWN)))))))
+
+(defn- on-eval [_view]
+  (when-let [root @root-view*]
+    (when-let [^EditText input (find-view root ::repl-input)]
+      (let [code (.. input getText toString trim)]
+        (when (seq code)
+          (append-output! (str "=> " code "\n"))
+          (reset! repl-evaluating?* true)
+          (future
+            (let [result (try
+                           (let [out (java.io.StringWriter.)
+                                 err (java.io.StringWriter.)
+                                 val (binding [*out* out *err* err]
+                                       (load-string code))
+                                 out-str (str out)
+                                 err-str (str err)]
+                             (str (when (seq out-str) out-str)
+                                  (when (seq err-str) (str "stderr: " err-str "\n"))
+                                  (pr-str val) "\n"))
+                           (catch Throwable t
+                             (str "Error: " (.getMessage t) "\n")))]
+              (append-output! result)
+              (reset! repl-evaluating?* false)
+              (scroll-to-bottom!)))
+          (on-ui (.setText input "")))))))
+
+(defn- on-clear-output [_view]
+  (reset! repl-output* ""))
+
+;; ---------------------------------------------------------------------------
 ;; Section UI
 ;; ---------------------------------------------------------------------------
 
@@ -194,4 +251,41 @@
                    :text error-text=
                    :text-size [14 :sp]
                    :text-color status-color=
-                   :padding [0 4 0 0]}]]]))
+                   :padding [0 4 0 0]}]
+      ;; --- Local REPL ---
+      [:view {:layout-width :fill
+              :layout-height 1
+              :padding [0 12 0 0]
+              :on-create (fn [^android.view.View v]
+                           (.setBackgroundColor v (unchecked-int 0xFF444444)))}]
+      [:text-view {:text "Local REPL"
+                   :text-size [22 :sp]
+                   :padding [0 12 0 8]}]
+      [:scroll-view {:id ::repl-scroll
+                     :layout-width :fill
+                     :layout-height 200
+                     :on-create (fn [^ScrollView v]
+                                  (.setBackgroundColor v (unchecked-int 0xFF1A1A2E)))}
+       [:text-view {:id ::repl-output
+                    :text repl-output*
+                    :text-size [13 :sp]
+                    :text-color (unchecked-int 0xFFE0E0E0)
+                    :padding [8 8 8 8]
+                    :layout-width :fill
+                    :on-create (fn [^TextView tv]
+                                 (.setTypeface tv Typeface/MONOSPACE))}]]
+      [:edit-text {:id ::repl-input
+                   :hint repl-hint=
+                   :layout-width :fill
+                   :enabled eval-btn-enabled=
+                   :on-create (fn [^EditText et]
+                                (.setTypeface et Typeface/MONOSPACE)
+                                (.setTextSize et 14)
+                                (.setMinLines et 2))}]
+      [:linear-layout {:orientation :horizontal
+                       :padding [0 4 0 16]}
+       [:button {:text "Eval"
+                 :enabled eval-btn-enabled=
+                 :on-click on-eval}]
+       [:button {:text "Clear"
+                 :on-click on-clear-output}]]]]))
