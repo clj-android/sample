@@ -231,7 +231,7 @@
                     :padding [0 8 8 0]}]
        [:edit-text {:id ::nrepl-port-input
                     :text "7888"
-                    :input-type :number}]]
+                    :input-type :integer}]]
       [:text-view {:id ::nrepl-status
                    :text status-text=
                    :text-size [16 :sp]

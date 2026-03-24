@@ -40,8 +40,12 @@
                  :text-size [16 :sp]
                  :text-color label-color
                  :padding [0 8 0 4]}]
-    [:edit-text {:hint "Number input"
+    [:edit-text {:hint "Number input (decimal)"
                  :input-type :number
+                 :layout-width :fill
+                 :padding [12 12 12 12]}]
+    [:edit-text {:hint "Integer input"
+                 :input-type :integer
                  :layout-width :fill
                  :padding [12 12 12 12]}]
     [:edit-text {:hint "Phone input"
