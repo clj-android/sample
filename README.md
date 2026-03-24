@@ -9,7 +9,7 @@ The app has two activities:
 
 ## Prerequisites
 
-- **JDK 17+**
+- **JDK 17+** (21 recommended; 26 may have compatibility issues)
 - **Android SDK** with platform API 35 installed. Set `sdk.dir` in `local.properties` or the `ANDROID_HOME` environment variable to point to your SDK installation.
 
 ## Dependencies
