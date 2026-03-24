@@ -5,6 +5,7 @@
     <application
         android:name="com.goodanser.clj_android.runtime.ClojureApp"
         android:label="Clojure Android Demo"
+        android:icon="@mipmap/ic_launcher"
         android:supportsRtl="true">
         <activity
             android:name=".MainActivity"
