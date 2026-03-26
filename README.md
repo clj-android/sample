@@ -77,7 +77,7 @@ Example — hot-reload the UI from the REPL:
 ```clojure
 (require '[com.example.clojuredroid.main-activity :as ui])
 
-(reset! ui/*ui-tree
+(reset! ui/ui-tree*
   [:linear-layout {:orientation :vertical :padding [32 32 32 32]}
    [:text-view {:text "Modified from REPL!" :text-size [24 :sp]}]])
 
