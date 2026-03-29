@@ -30,6 +30,7 @@
             [com.example.clojuredroid.demos.sensors :as sensors]
             [com.example.clojuredroid.demos.inertial-nav :as inertial]
             [com.example.clojuredroid.demos.intents :as intents]
+            [com.example.clojuredroid.demos.camera :as camera]
             [com.example.clojuredroid.repl :as repl-ui])
   (:import android.app.Activity
            android.view.View
@@ -48,6 +49,7 @@
    [::sensors  "Sensors"             sensors/section-ui]
    [::inertial "Inertial Nav"       inertial/section-ui]
    [::intents  "Intents"             intents/section-ui]
+   [::camera   "Camera"              camera/section-ui]
    [::repl     "nREPL"               repl-ui/section-ui]])
 
 (defn- drawer-content-spec []
@@ -127,6 +129,7 @@
        (sensors/section-ui @activity* ::sensors)
        (inertial/section-ui @activity* ::inertial)
        (intents/section-ui @activity* ::intents)
+       (camera/section-ui @activity* ::camera)
        (repl-ui/section-ui @activity* ::repl)]]
      ;; === Drawer (second child, layout-gravity :start) ===
      [:scroll-view {:layout-width [280 :dp]

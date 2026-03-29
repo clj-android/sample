@@ -51,6 +51,9 @@ dependencies {
     implementation("org.clojure:clojure:1.12.0")
     implementation("com.goodanser.clj-android:neko:5.0.0-SNAPSHOT")
     implementation("com.google.android.material:material:1.12.0")
+    implementation("androidx.camera:camera-camera2:1.4.1")
+    implementation("androidx.camera:camera-lifecycle:1.4.1")
+    implementation("androidx.camera:camera-view:1.4.1")
 
     testImplementation("org.clojure:clojure:1.12.0")
     testImplementation("org.clojure:spec.alpha:0.5.238")
