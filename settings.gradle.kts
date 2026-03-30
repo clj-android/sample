@@ -51,7 +51,7 @@ fun propagateLocalProperties(dir: java.io.File) {
  * - Missing or empty directories are cloned automatically (--depth 1).
  * - Shallow clones (from a previous auto-clone) are updated with git pull
  *   so they stay current when upstream pushes new commits.
- * - Full (non-shallow) user checkouts are left untouched.
+ * - Non-shallow checkouts (manually placed by the developer) are left untouched.
  *
  * Returns the directory if it contains a valid Gradle project, or null if
  * cloning failed (in which case Gradle falls back to published artifacts
@@ -59,24 +59,6 @@ fun propagateLocalProperties(dir: java.io.File) {
  */
 fun ensureDep(name: String): java.io.File? {
     val dir = java.io.File(depsDir, name)
-
-    // Prefer a sibling directory in the parent (monorepo layout).
-    // If ../name exists and has a build file, symlink it into build/deps/
-    // so the local working copy is used instead of an auto-clone.
-    val siblingDir = file("../$name")
-    if (siblingDir.isDirectory && java.io.File(siblingDir, "build.gradle.kts").isFile) {
-        if (!dir.exists() || (isShallowClone(dir) && !java.nio.file.Files.isSymbolicLink(dir.toPath()))) {
-            // Replace auto-clone with symlink to sibling
-            if (dir.exists()) dir.deleteRecursively()
-            depsDir.mkdirs()
-            java.nio.file.Files.createSymbolicLink(dir.toPath(), siblingDir.toPath())
-            println("Using local sibling: $name -> ${siblingDir.absolutePath}")
-        }
-        if (java.nio.file.Files.isSymbolicLink(dir.toPath())) {
-            propagateLocalProperties(dir)
-            return dir
-        }
-    }
 
     val hasBuildFile = java.io.File(dir, "build.gradle.kts").isFile
 
@@ -92,6 +74,9 @@ fun ensureDep(name: String): java.io.File? {
         } catch (_: Exception) {
             // Non-fatal — the existing checkout is still usable.
         }
+        // Remove stale build artifacts so F-Droid's scanner doesn't flag them.
+        val buildDir = java.io.File(dir, "build")
+        if (buildDir.isDirectory) buildDir.deleteRecursively()
         propagateLocalProperties(dir)
         return dir
     }
